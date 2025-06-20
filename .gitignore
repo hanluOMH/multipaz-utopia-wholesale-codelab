@@ -1,0 +1,98 @@
+# Gradle files
+.gradle/
+build/
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Log/OS Files
+*.log
+
+# Android Studio generated files and folders
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+output-metadata.json
+
+# IntelliJ
+*.iml
+.idea/
+misc.xml
+deploymentTargetDropDown.xml
+render.experimental.xml
+
+# Keystore files
+*.jks
+*.keystore
+
+# Google Services (e.g. APIs or Firebase)
+google-services.json
+
+# Android Profiling
+*.hprof
+
+# --- Compose Multiplatform additions ---
+# Kotlin/Native build outputs
+.kotlinc/
+.kotlin/
+*.klib
+
+# Compose Multiplatform build outputs
+composeApp/build/
+
+# Xcode/iOS
+*.xcuserstate
+*.xcworkspace
+*.xcuserdata
+*.xccheckout
+*.moved-aside
+*.xcuserdatad
+*.xcscmblueprint
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/xcshareddata/WorkspaceSettings.xcsettings
+*.xcodeproj/xcshareddata/swiftpm/
+.DS_Store
+
+# SwiftPM
+.build/
+
+# Carthage
+Carthage/Build/
+
+# CocoaPods
+Pods/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# Android/Gradle (already present, but ensure coverage)
+*.apk
+*.ap_  
+*.aab
+*.dex
+*.class
+*.jar
+*.war
+*.ear
+*.iml
+.gradle/
+build/
+local.properties
+
+# IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log.DS_Store
