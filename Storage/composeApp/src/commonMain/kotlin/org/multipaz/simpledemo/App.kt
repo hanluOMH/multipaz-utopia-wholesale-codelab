@@ -14,8 +14,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 // import io.ktor.client.request.forms.formData
 import kotlinx.coroutines.launch
+import kotlinx.io.bytestring.ByteString
 
 import kotlinx.io.bytestring.encodeToByteString
+import org.jetbrains.compose.resources.getDrawableResourceBytes
+import org.jetbrains.compose.resources.getSystemResourceEnvironment
 
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.multipaz.document.Document
@@ -27,7 +30,8 @@ import org.multipaz.securearea.SecureAreaRepository
 import org.multipaz.storage.Storage
 import org.multipaz.util.Platform.getNonBackedUpStorage
 import org.multipaz.util.Platform.getSecureArea
-
+import simplemultipazdemo.composeapp.generated.resources.Res
+import simplemultipazdemo.composeapp.generated.resources.profile
 
 lateinit var storage: Storage
 lateinit var secureArea: SecureArea
@@ -64,10 +68,15 @@ fun App() {
                      documentStore = buildDocumentStore(
                         storage = storage, secureAreaRepository = secureAreaRepository
                     ) {}
-
-                    //TODO(), in the future will store cardArt , so far didn't  find good solution to find convert Res.drawble.img to ByteString
+                    val profile = ByteString(
+                        getDrawableResourceBytes(
+                            getSystemResourceEnvironment(),
+                            Res.drawable.profile,
+                        )
+                    )
                     createStorage(
                         displayName = "Tom Lee's Utopia Membership",
+                        cardArt = profile,
                         others = UtopiaMemberInfo().toJsonString().encodeToByteString()
                     )
                 }
