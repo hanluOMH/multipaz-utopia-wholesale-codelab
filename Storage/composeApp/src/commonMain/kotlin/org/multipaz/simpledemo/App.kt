@@ -28,7 +28,6 @@ import org.multipaz.documenttype.DocumentTypeRepository
 import org.multipaz.securearea.SecureArea
 import org.multipaz.securearea.SecureAreaRepository
 import org.multipaz.storage.Storage
-import org.multipaz.util.Logger
 import org.multipaz.util.Platform.getNonBackedUpStorage
 import org.multipaz.util.Platform.getSecureArea
 import simplemultipazdemo.composeapp.generated.resources.Res
@@ -38,12 +37,13 @@ lateinit var storage: Storage
 lateinit var secureArea: SecureArea
 lateinit var secureAreaRepository: SecureAreaRepository
 
+lateinit var documentTypeRepository: DocumentTypeRepository
 lateinit var documentStore: DocumentStore
 //
 private val documents = mutableStateListOf<Document>()
 
 
-private const val TAG = "APP"
+
 
 @Composable
 @Preview
@@ -62,51 +62,25 @@ fun App() {
                 MembershipCard()
                 coroutineScope.launch {
                      storage  = getNonBackedUpStorage()
-                     secureArea = getSecureArea(storage)
+                     secureArea = getSecureArea(org.multipaz.simpledemo.storage)
                      secureAreaRepository = SecureAreaRepository.Builder().add(secureArea).build()
 
                      documentStore = buildDocumentStore(
                         storage = storage, secureAreaRepository = secureAreaRepository
                     ) {}
-
-                   val profile = ByteString(
+                    val profile = ByteString(
                         getDrawableResourceBytes(
                             getSystemResourceEnvironment(),
                             Res.drawable.profile,
                         )
                     )
-
-                    val document = documentStore.createDocument(
-                        displayName ="Tom Lee's Utopia Membership",
-                        typeDisplayName = "Membership Card",
+                    createStorage(
+                        displayName = "Tom Lee's Utopia Membership",
                         cardArt = profile,
-                        other = UtopiaMemberInfo().toJsonString().encodeToByteString(),
+                        others = UtopiaMemberInfo().toJsonString().encodeToByteString()
                     )
-
-
-                    documents.add(document)
-                    for (documentId in documentStore.listDocuments()) {
-                        documentStore.lookupDocument(documentId)?.let { document ->
-                            Logger.i(TAG,"document identifier : ${document.identifier}")
-                        }
-                    }
-
-//                    for (documentId in documentStore.listDocuments()) {
-//                        Logger.i(TAG,"delete ${document.identifier}")
-//                        documentStore.deleteDocument(documentId)
-
-//                    }
-                    val credential = createCredential(document)
-
-                    Logger.i(TAG,"credential identifier: ${credential.identifier}")
-
-
-
                 }
             }
         }
     }
 }
-
-
-

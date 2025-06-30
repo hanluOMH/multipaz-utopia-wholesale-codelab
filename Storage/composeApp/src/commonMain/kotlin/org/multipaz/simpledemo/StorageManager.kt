@@ -9,13 +9,14 @@ import org.multipaz.util.Platform.getNonBackedUpStorage
 import org.multipaz.util.Platform.getSecureArea
 
 
-suspend fun createStorage(displayName: String, cardArt:ByteString?, others: ByteString){
+suspend fun createStorage(displayName: String, cardArt : ByteString?, others: ByteString){
 
 
     val document = documentStore.createDocument(
         displayName = displayName,
         typeDisplayName = "Membership Card",
         cardArt = cardArt,
+        issuerLogo = null,
         other = others,
     )
 
