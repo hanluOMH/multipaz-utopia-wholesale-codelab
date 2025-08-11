@@ -16,6 +16,8 @@ import io.ktor.util.encodeBase64
 import io.ktor.utils.io.printStack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.io.bytestring.encodeToByteString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -23,6 +25,10 @@ import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.multipaz.asn1.OID
 import org.multipaz.crypto.Algorithm
 import org.multipaz.crypto.Crypto
@@ -544,12 +550,15 @@ class OpenID4VCIEnrollment {
             }
         }
 
-        suspend fun handleDeepLink(url: String){
+        suspend fun handleDeepLink(url: String, processCredentials: suspend (List<ByteArray>) -> Unit){
             withContext(TestBackendEnvironment){
                 handleDeepLink(
                     deepLinkUrl = url,
                     onSuccess = { list ->
-                        Logger.i(TAG, "credentials size is ${list.size}")
+                        // Defer storage/processing to caller-provided function
+                        CoroutineScope(Dispatchers.IO).launch {
+                            processCredentials(list)
+                        }
                     },
                     onError = { e ->
                         e.printStack()

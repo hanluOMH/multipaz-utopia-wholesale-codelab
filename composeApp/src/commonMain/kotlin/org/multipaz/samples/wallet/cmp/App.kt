@@ -96,6 +96,24 @@ import org.multipaz.crypto.EcPublicKey
 import org.multipaz.util.Logger
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import org.multipaz.util.fromBase64Url
+import org.multipaz.sdjwt.SdJwt
+import org.multipaz.mdoc.mso.StaticAuthDataParser
+import org.multipaz.cbor.Cbor
+import org.multipaz.mdoc.mso.MobileSecurityObjectParser
+import org.multipaz.sdjwt.credential.KeylessSdJwtVcCredential
+import org.multipaz.mdoc.credential.MdocCredential
+import org.multipaz.trustmanagement.TrustManagerLocal
+import org.multipaz.trustmanagement.TrustMetadata
+import org.multipaz.securearea.CreateKeySettings as SA_CreateKeySettings
 
 /**
  * Application singleton.
@@ -167,25 +185,41 @@ class App() {
                     cardArt = profile,
                     other = UtopiaMemberInfo().toJsonString().encodeToByteString(),
                 )
-                val mdocCredential =
-                    DrivingLicense.getDocumentType().createMdocCredentialWithSampleData(
-                        document = document,
-                        secureArea = secureArea,
-                        createKeySettings = CreateKeySettings(
-                            algorithm = Algorithm.ESP256,
-                            nonce = "Challenge".encodeToByteString(),
-                            userAuthenticationRequired = true
-                        ),
-                        dsKey = dsKey,
-                        dsCertChain = X509CertChain(listOf(dsCert)),
-                        signedAt = signedAt,
-                        validFrom = validFrom,
-                        validUntil = validUntil,
-                    )
+//                val mdocCredential =
+//                    DrivingLicense.getDocumentType().createMdocCredentialWithSampleData(
+//                        document = document,
+//                        secureArea = secureArea,
+//                        createKeySettings = CreateKeySettings(
+//                            algorithm = Algorithm.ESP256,
+//                            nonce = "Challenge".encodeToByteString(),
+//                            userAuthenticationRequired = true
+//                        ),
+//                        dsKey = dsKey,
+//                        dsCertChain = X509CertChain(listOf(dsCert)),
+//                        signedAt = signedAt,
+//                        validFrom = validFrom,
+//                        validUntil = validUntil,
+//                    )
             }else{
                 Logger.i(appName,"document already exists")
             }
-//            presentmentModel = PresentmentModel().apply { setPromptModel(promptModel) }
+            presentmentModel = PresentmentModel().apply { setPromptModel(promptModel) }
+
+            val tm = TrustManagerLocal(storage = storage, identifier = "reader")
+            tm.addX509Cert(
+                certificate = X509Cert.fromPem(getReader_Root_Cert().trimIndent().trim()),
+                metadata = TrustMetadata(
+                    displayName = "Multipaz Verifier",
+                    displayIcon = null,
+                    privacyPolicyUrl = "https://apps.multipaz.org",
+                    testOnly = true
+                )
+            )
+// Or, if you have a Signed VICAL bytes:
+// tm.addVical(encodedSignedVical = ByteString(vicalBytes), metadata = TrustMetadata(displayName = "VICAL Source"))
+
+            readerTrustManager = tm
+
 //            readerTrustManager = TrustManager().apply {
 //                addTrustPoint(
 //                    TrustPoint(
@@ -208,20 +242,24 @@ class App() {
 //                    )
 //                )
 //            }
-//            presentmentSource = SimplePresentmentSource(
-//                documentStore = documentStore,
-//                documentTypeRepository = documentTypeRepository,
-//                readerTrustManager = readerTrustManager,
-//                preferSignatureToKeyAgreement = true,
-//                domainMdocSignature = "mdoc",
-//            )
-//            if (DigitalCredentials.Default.available) {
-//                //The credentials will still exist in your document store and can be used for other presentation mechanisms like proximity sharing (NFC/BLE), but they won't be accessible through the standardized digital credentials infrastructure that Android provides.
-//                DigitalCredentials.Default.startExportingCredentials(
-//                    documentStore = documentStore,
-//                    documentTypeRepository = documentTypeRepository
-//                )
-//            }
+            presentmentSource = SimplePresentmentSource(
+                documentStore = documentStore,
+                documentTypeRepository = documentTypeRepository,
+                readerTrustManager = readerTrustManager,
+                preferSignatureToKeyAgreement = true,
+                // Match domains used when storing credentials via OpenID4VCI
+                domainMdocSignature = "openid4vci",
+                domainMdocKeyAgreement = "openid4vci",
+                domainKeylessSdJwt = "openid4vci",
+                domainKeyBoundSdJwt = "openid4vci",
+            )
+            if (DigitalCredentials.Default.available) {
+                //The credentials will still exist in your document store and can be used for other presentation mechanisms like proximity sharing (NFC/BLE), but they won't be accessible through the standardized digital credentials infrastructure that Android provides.
+                DigitalCredentials.Default.startExportingCredentials(
+                    documentStore = documentStore,
+                    documentTypeRepository = documentTypeRepository
+                )
+            }
             initialized = true
         }
     }
@@ -443,12 +481,113 @@ class App() {
     fun handleUrl(url: String) {
         //TODO
         CoroutineScope(Dispatchers.IO).launch {
-            // Initialize the backend provider first
-            OpenID4VCIEnrollment.handleDeepLink(url)
+            // Initialize the backend provider and pass storage callback
+            OpenID4VCIEnrollment.handleDeepLink(url) { creds ->
+                storeIssuedCredentialsRaw(creds)
+            }
         }
 
 
 
+    }
+
+    /**
+     * Store issued credentials returned by OpenID4VCI enrollment into the existing document.
+     * Accepts raw credential bytes as returned by client.obtainCredentials().
+     */
+    @OptIn(ExperimentalTime::class)
+    suspend fun storeIssuedCredentialsRaw(credentialBytesList: List<ByteArray>) {
+        if (documentStore.listDocuments().isEmpty()) {
+            Logger.w(appName, "No document available to store credentials")
+            return
+        }
+        val documentId = documentStore.listDocuments().first()
+        val document = documentStore.lookupDocument(documentId) ?: return
+        val domain = "openid4vci"
+
+        // Build a normalized response-like Json for logging consistency
+        val responseJson = buildJsonObject {
+            put("credentials", buildJsonArray {
+                credentialBytesList.forEach { rawBytes ->
+                    val asString = try {
+                        val text = rawBytes.decodeToString()
+                        val dotCount = text.count { it == '.' }
+                        val printable = text.all { ch ->
+                            val c = ch.code
+                            (c in 32..126) || ch == '\n' || ch == '\r' || ch == '\t'
+                        }
+                        if (printable && dotCount >= 2) text else rawBytes.toBase64Url()
+                    } catch (_: Throwable) {
+                        rawBytes.toBase64Url()
+                    }
+                    add(buildJsonObject { put("credential", JsonPrimitive(asString)) })
+                }
+            })
+        }
+        Logger.i(appName, "Issuer response: $responseJson")
+
+        val jsonArray = (responseJson["credentials"] as JsonArray)
+        Logger.i(appName, "Normalized credentials array size: ${jsonArray.size}")
+        jsonArray.forEachIndexed { index, element ->
+            Logger.i(appName, "credentials[$index]: $element")
+        }
+        var storedCount = 0
+        jsonArray.forEach { item ->
+            val credentialString = item.jsonObject["credential"]!!.jsonPrimitive.content
+            // Try SD-JWT first
+            val stored = runCatching {
+                val sdJwt = SdJwt(credentialString)
+                val vct = "unknown"
+                val cred = KeylessSdJwtVcCredential.create(
+                    document = document,
+                    asReplacementForIdentifier = null,
+                    domain = domain,
+                    vct = vct
+                )
+                cred.certify(
+                    issuerProvidedAuthenticationData = credentialString.encodeToByteArray(),
+                    validFrom = sdJwt.validFrom ?: sdJwt.issuedAt ?: Clock.System.now(),
+                    validUntil = sdJwt.validUntil ?: kotlin.time.Instant.DISTANT_FUTURE
+                )
+                true
+            }.getOrElse {
+                false
+            }
+            if (stored) {
+                storedCount += 1
+                return@forEach
+            }
+
+            // Try mdoc (IssuerSigned base64url)
+            runCatching {
+                val credentialBytes = credentialString.fromBase64Url()
+                val staticAuth = StaticAuthDataParser(credentialBytes).parse()
+                val issuerAuthCoseSign1 = Cbor.decode(staticAuth.issuerAuth).asCoseSign1
+                val encodedMsoBytes = Cbor.decode(issuerAuthCoseSign1.payload!!)
+                val encodedMso = Cbor.encode(encodedMsoBytes.asTaggedEncodedCbor)
+                val mso = MobileSecurityObjectParser(encodedMso).parse()
+
+                val mdocCred = MdocCredential.create(
+                    document = document,
+                    asReplacementForIdentifier = null,
+                    domain = domain,
+                    secureArea = secureArea,
+                    docType = mso.docType,
+                    createKeySettings = SA_CreateKeySettings(
+                        nonce = "Enroll".encodeToByteString()
+                    )
+                )
+                mdocCred.certify(
+                    issuerProvidedAuthenticationData = credentialBytes,
+                    validFrom = mso.validFrom,
+                    validUntil = mso.validUntil
+                )
+                storedCount += 1
+            }.onFailure { e ->
+                Logger.w(appName, "Skipping unknown credential format: ${e.message}")
+            }
+        }
+        Logger.i(appName, "Stored $storedCount credential(s) into document $documentId")
     }
 
     companion object {
