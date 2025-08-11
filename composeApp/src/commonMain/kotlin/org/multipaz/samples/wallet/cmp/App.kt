@@ -42,7 +42,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Clock
+
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.encodeToByteString
 import utopiasample.composeapp.generated.resources.Res
@@ -94,6 +94,8 @@ import org.jetbrains.compose.resources.getSystemResourceEnvironment
 import org.multipaz.crypto.EcPrivateKey
 import org.multipaz.crypto.EcPublicKey
 import org.multipaz.util.Logger
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 /**
  * Application singleton.
@@ -116,6 +118,7 @@ class App() {
     val appName = "UtopiaSample"
     val appIcon = Res.drawable.profile
 
+    @OptIn(ExperimentalTime::class)
     suspend fun init() {
         initLock.withLock {
             if (initialized) {
@@ -128,60 +131,60 @@ class App() {
                 addDocumentType(DrivingLicense.getDocumentType())
             }
             documentStore = buildDocumentStore(storage = storage, secureAreaRepository = secureAreaRepository) {}
-//            if (documentStore.listDocuments().isEmpty()) {
-//                Logger.i(appName,"create document")
-//                val now = Clock.System.now()
-//                val signedAt = now
-//                val validFrom = now
-//                val validUntil = now + 365.days
-//                val iacaCert = X509Cert.fromPem(
-//                    getIaca_Cert()
-//                )
-//                Logger.i(appName, iacaCert.toPem())
-//                val iacaKey = EcPrivateKey.fromPem(
-//                    iaca_private_key,
-//                    iacaCert.ecPublicKey
-//                )
-//                val dsKey = Crypto.createEcPrivateKey(EcCurve.P256)
-//                val dsCert = MdocUtil.generateDsCertificate(
-//                    iacaCert = iacaCert,
-//                    iacaKey = iacaKey,
-//                    dsKey = dsKey.publicKey,
-//                    subject = X500Name.fromName(name = "CN=Test DS Key"),
-//                    serial = ASN1Integer.fromRandom(numBits = 128),
-//                    validFrom = validFrom,
-//                    validUntil = validUntil
-//                )
-//                val profile = ByteString(
-//                    getDrawableResourceBytes(
-//                        getSystemResourceEnvironment(),
-//                        Res.drawable.profile,
-//                    )
-//                )
-//                val document = documentStore.createDocument(
-//                    displayName ="Tom Lee's Utopia Membership",
-//                    typeDisplayName = "Membership Card",
-//                    cardArt = profile,
-//                    other = UtopiaMemberInfo().toJsonString().encodeToByteString(),
-//                )
-//                val mdocCredential =
-//                    DrivingLicense.getDocumentType().createMdocCredentialWithSampleData(
-//                        document = document,
-//                        secureArea = secureArea,
-//                        createKeySettings = CreateKeySettings(
-//                            algorithm = Algorithm.ESP256,
-//                            nonce = "Challenge".encodeToByteString(),
-//                            userAuthenticationRequired = true
-//                        ),
-//                        dsKey = dsKey,
-//                        dsCertChain = X509CertChain(listOf(dsCert)),
-//                        signedAt = signedAt,
-//                        validFrom = validFrom,
-//                        validUntil = validUntil,
-//                    )
-//            }else{
-//                Logger.i(appName,"document already exists")
-//            }
+            if (documentStore.listDocuments().isEmpty()) {
+                Logger.i(appName,"create document")
+                val now = Clock.System.now()
+                val signedAt = now
+                val validFrom = now
+                val validUntil = now + 365.days
+                val iacaCert = X509Cert.fromPem(
+                    getIaca_Cert()
+                )
+                Logger.i(appName, iacaCert.toPem())
+                val iacaKey = EcPrivateKey.fromPem(
+                    iaca_private_key,
+                    iacaCert.ecPublicKey
+                )
+                val dsKey = Crypto.createEcPrivateKey(EcCurve.P256)
+                val dsCert = MdocUtil.generateDsCertificate(
+                    iacaCert = iacaCert,
+                    iacaKey = iacaKey,
+                    dsKey = dsKey.publicKey,
+                    subject = X500Name.fromName(name = "CN=Test DS Key"),
+                    serial = ASN1Integer.fromRandom(numBits = 128),
+                    validFrom = validFrom,
+                    validUntil = validUntil
+                )
+                val profile = ByteString(
+                    getDrawableResourceBytes(
+                        getSystemResourceEnvironment(),
+                        Res.drawable.profile,
+                    )
+                )
+                val document = documentStore.createDocument(
+                    displayName ="Tom Lee's Utopia Membership",
+                    typeDisplayName = "Membership Card",
+                    cardArt = profile,
+                    other = UtopiaMemberInfo().toJsonString().encodeToByteString(),
+                )
+                val mdocCredential =
+                    DrivingLicense.getDocumentType().createMdocCredentialWithSampleData(
+                        document = document,
+                        secureArea = secureArea,
+                        createKeySettings = CreateKeySettings(
+                            algorithm = Algorithm.ESP256,
+                            nonce = "Challenge".encodeToByteString(),
+                            userAuthenticationRequired = true
+                        ),
+                        dsKey = dsKey,
+                        dsCertChain = X509CertChain(listOf(dsCert)),
+                        signedAt = signedAt,
+                        validFrom = validFrom,
+                        validUntil = validUntil,
+                    )
+            }else{
+                Logger.i(appName,"document already exists")
+            }
 //            presentmentModel = PresentmentModel().apply { setPromptModel(promptModel) }
 //            readerTrustManager = TrustManager().apply {
 //                addTrustPoint(
