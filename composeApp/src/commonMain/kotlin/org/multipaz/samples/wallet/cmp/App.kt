@@ -113,6 +113,7 @@ import org.multipaz.sdjwt.credential.KeylessSdJwtVcCredential
 import org.multipaz.mdoc.credential.MdocCredential
 import org.multipaz.trustmanagement.TrustManagerLocal
 import org.multipaz.trustmanagement.TrustMetadata
+import org.multipaz.trustmanagement.TrustPointAlreadyExistsException
 import org.multipaz.securearea.CreateKeySettings as SA_CreateKeySettings
 
 /**
@@ -206,15 +207,19 @@ class App() {
             presentmentModel = PresentmentModel().apply { setPromptModel(promptModel) }
 
             val tm = TrustManagerLocal(storage = storage, identifier = "reader")
-            tm.addX509Cert(
-                certificate = X509Cert.fromPem(getReader_Root_Cert().trimIndent().trim()),
-                metadata = TrustMetadata(
-                    displayName = "Multipaz Verifier",
-                    displayIcon = null,
-                    privacyPolicyUrl = "https://apps.multipaz.org",
-                    testOnly = true
+            try {
+                tm.addX509Cert(
+                    certificate = X509Cert.fromPem(getReader_Root_Cert().trimIndent().trim()),
+                    metadata = TrustMetadata(
+                        displayName = "Multipaz Verifier",
+                        displayIcon = null,
+                        privacyPolicyUrl = "https://apps.multipaz.org",
+                        testOnly = true
+                    )
                 )
-            )
+            }catch (e: TrustPointAlreadyExistsException){
+                e.printStack()
+            }
 // Or, if you have a Signed VICAL bytes:
 // tm.addVical(encodedSignedVical = ByteString(vicalBytes), metadata = TrustMetadata(displayName = "VICAL Source"))
 
@@ -501,8 +506,14 @@ class App() {
             Logger.w(appName, "No document available to store credentials")
             return
         }
+
+        // If the first document already has any credentials, skip storing to avoid duplicates
         val documentId = documentStore.listDocuments().first()
         val document = documentStore.lookupDocument(documentId) ?: return
+        if (document.getCredentials().isNotEmpty()) {
+            Logger.i(appName, "Document $documentId already has credentials; skipping store")
+            return
+        }
         val domain = "openid4vci"
 
         // Build a normalized response-like Json for logging consistency
