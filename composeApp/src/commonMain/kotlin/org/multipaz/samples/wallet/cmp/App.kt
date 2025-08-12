@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -21,9 +22,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -359,13 +362,23 @@ class App() {
             }
         } else {
             val state = presentmentModel.state.collectAsState()
+            val noCredentialDialog = remember { mutableStateOf(false) }
             when (state.value) {
                 PresentmentModel.State.IDLE -> {
                     showQrButton(deviceEngagement)
                 }
 
                 PresentmentModel.State.CONNECTING -> {
-                    showQrCode(deviceEngagement)
+                    LaunchedEffect(Unit) {
+                        val hasCred = hasAnyUsableCredential()
+                        if (!hasCred) {
+                            noCredentialDialog.value = true
+                            presentmentModel.reset()
+                        }
+                    }
+                    if (!noCredentialDialog.value) {
+                        showQrCode(deviceEngagement)
+                    }
                 }
 
                 PresentmentModel.State.WAITING_FOR_SOURCE,
@@ -384,6 +397,18 @@ class App() {
                         },
                     )
                 }
+            }
+            if (noCredentialDialog.value) {
+                AlertDialog(
+                    onDismissRequest = { noCredentialDialog.value = false },
+                    title = { Text("No credential available") },
+                    text = { Text("Please add a credential before presenting.") },
+                    confirmButton = {
+                        TextButton(onClick = { noCredentialDialog.value = false }) {
+                            Text("OK")
+                        }
+                    }
+                )
             }
         }
     }
@@ -477,6 +502,14 @@ class App() {
                 }
             }
         }
+    }
+
+    @OptIn(ExperimentalTime::class)
+    private suspend fun hasAnyUsableCredential(): Boolean {
+        if (documentStore.listDocuments().isEmpty()) return false
+        val documentId = documentStore.listDocuments().first()
+        val document = documentStore.lookupDocument(documentId) ?: return false
+        return document.hasUsableCredential()
     }
 
 
