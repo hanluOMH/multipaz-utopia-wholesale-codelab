@@ -2,7 +2,6 @@ package org.multipaz.samples.wallet.cmp
 
 
 import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
 import io.ktor.client.statement.readBytes
@@ -246,7 +245,7 @@ class OpenID4VCIEnrollment {
         /**
          * HTTP client for form submissions
          */
-        private val httpClient = HttpClient(CIO) {
+        private val httpClient = HttpClient() {
             followRedirects = false
         }
 
@@ -556,7 +555,7 @@ class OpenID4VCIEnrollment {
                     deepLinkUrl = url,
                     onSuccess = { list ->
                         // Defer storage/processing to caller-provided function
-                        CoroutineScope(Dispatchers.IO).launch {
+                        CoroutineScope(Dispatchers.Default).launch {
                             processCredentials(list)
                         }
                     },

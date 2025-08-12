@@ -27,6 +27,8 @@ kotlin {
             isStatic = true
         }
     }
+    // Create unified iOS source set hierarchy so 'iosMain' exists
+    applyDefaultHierarchyTemplate()
     
     sourceSets {
         
@@ -34,6 +36,7 @@ kotlin {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.appcompat)
+            implementation(libs.ktor.client.android)
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -51,8 +54,15 @@ kotlin {
             implementation(libs.multipaz.models)
             implementation(libs.multipaz.compose)
             implementation(libs.ktor.client.core)
-            implementation(libs.ktor.client.java)
+            // CIO for JVM/Android; Darwin engine for iOS in iosMain
             implementation(libs.ktor.client.cio)
+        }
+        val iosMain by getting {
+            dependencies {
+                implementation(libs.ktor.client.darwin)
+                implementation(libs.androidx.sqlite)
+                implementation(libs.androidx.sqlite.framework)
+            }
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

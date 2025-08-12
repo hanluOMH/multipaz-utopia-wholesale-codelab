@@ -152,28 +152,28 @@ class App() {
             documentStore = buildDocumentStore(storage = storage, secureAreaRepository = secureAreaRepository) {}
             if (documentStore.listDocuments().isEmpty()) {
                 Logger.i(appName,"create document")
-                val now = Clock.System.now()
-                val signedAt = now
-                val validFrom = now
-                val validUntil = now + 365.days
-                val iacaCert = X509Cert.fromPem(
-                    getIaca_Cert()
-                )
-                Logger.i(appName, iacaCert.toPem())
-                val iacaKey = EcPrivateKey.fromPem(
-                    iaca_private_key,
-                    iacaCert.ecPublicKey
-                )
-                val dsKey = Crypto.createEcPrivateKey(EcCurve.P256)
-                val dsCert = MdocUtil.generateDsCertificate(
-                    iacaCert = iacaCert,
-                    iacaKey = iacaKey,
-                    dsKey = dsKey.publicKey,
-                    subject = X500Name.fromName(name = "CN=Test DS Key"),
-                    serial = ASN1Integer.fromRandom(numBits = 128),
-                    validFrom = validFrom,
-                    validUntil = validUntil
-                )
+//                val now = Clock.System.now()
+//                val signedAt = now
+//                val validFrom = now
+//                val validUntil = now + 365.days
+//                val iacaCert = X509Cert.fromPem(
+//                    getIaca_Cert()
+//                )
+//                Logger.i(appName, iacaCert.toPem())
+//                val iacaKey = EcPrivateKey.fromPem(
+//                    iaca_private_key,
+//                    iacaCert.ecPublicKey
+//                )
+//                val dsKey = Crypto.createEcPrivateKey(EcCurve.P256)
+//                val dsCert = MdocUtil.generateDsCertificate(
+//                    iacaCert = iacaCert,
+//                    iacaKey = iacaKey,
+//                    dsKey = dsKey.publicKey,
+//                    subject = X500Name.fromName(name = "CN=Test DS Key"),
+//                    serial = ASN1Integer.fromRandom(numBits = 128),
+//                    validFrom = validFrom,
+//                    validUntil = validUntil
+//                )
                 val profile = ByteString(
                     getDrawableResourceBytes(
                         getSystemResourceEnvironment(),
