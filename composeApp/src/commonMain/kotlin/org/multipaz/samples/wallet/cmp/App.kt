@@ -1,5 +1,7 @@
 package org.multipaz.samples.wallet.cmp
 
+// Add navigation imports
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -13,20 +15,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -36,88 +37,80 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import io.ktor.utils.io.core.toByteArray
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import io.ktor.utils.io.printStack
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.encodeToByteString
-import utopiasample.composeapp.generated.resources.Res
-import utopiasample.composeapp.generated.resources.compose_multiplatform
-import org.jetbrains.compose.resources.painterResource
-import org.multipaz.asn1.ASN1Integer
-import org.multipaz.cbor.Simple
-import org.multipaz.compose.permissions.rememberBluetoothPermissionState
-import org.multipaz.compose.presentment.Presentment
-import org.multipaz.compose.prompt.PromptDialogs
-import org.multipaz.compose.qrcode.generateQrCode
-import org.multipaz.crypto.Algorithm
-import org.multipaz.crypto.Crypto
-import org.multipaz.crypto.EcCurve
-import org.multipaz.crypto.X500Name
-import org.multipaz.crypto.X509Cert
-import org.multipaz.crypto.X509CertChain
-import org.multipaz.document.DocumentStore
-import org.multipaz.document.buildDocumentStore
-import org.multipaz.documenttype.DocumentTypeRepository
-import org.multipaz.documenttype.knowntypes.DrivingLicense
-import org.multipaz.mdoc.connectionmethod.MdocConnectionMethodBle
-import org.multipaz.mdoc.engagement.EngagementGenerator
-import org.multipaz.mdoc.role.MdocRole
-import org.multipaz.mdoc.transport.MdocTransportFactory
-import org.multipaz.mdoc.transport.MdocTransportOptions
-import org.multipaz.mdoc.transport.advertise
-import org.multipaz.mdoc.transport.waitForConnection
-import org.multipaz.mdoc.util.MdocUtil
-import org.multipaz.models.digitalcredentials.DigitalCredentials
-import org.multipaz.models.presentment.MdocPresentmentMechanism
-import org.multipaz.models.presentment.PresentmentModel
-import org.multipaz.models.presentment.PresentmentSource
-import org.multipaz.models.presentment.SimplePresentmentSource
-import org.multipaz.securearea.CreateKeySettings
-import org.multipaz.securearea.SecureArea
-import org.multipaz.securearea.SecureAreaRepository
-import org.multipaz.storage.Storage
-import org.multipaz.trustmanagement.TrustManager
-import org.multipaz.trustmanagement.TrustPoint
-import org.multipaz.util.Platform
-import org.multipaz.util.UUID
-import org.multipaz.util.fromHex
-import org.multipaz.util.toBase64Url
-import kotlin.time.Duration.Companion.days
-import utopiasample.composeapp.generated.resources.profile
-import org.jetbrains.compose.resources.getDrawableResourceBytes
-import org.jetbrains.compose.resources.getSystemResourceEnvironment
-import org.multipaz.crypto.EcPrivateKey
-import org.multipaz.crypto.EcPublicKey
-import org.multipaz.util.Logger
-import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import org.multipaz.util.fromBase64Url
-import org.multipaz.sdjwt.SdJwt
-import org.multipaz.mdoc.mso.StaticAuthDataParser
+import org.jetbrains.compose.resources.getDrawableResourceBytes
+import org.jetbrains.compose.resources.getSystemResourceEnvironment
+import org.jetbrains.compose.resources.painterResource
 import org.multipaz.cbor.Cbor
-import org.multipaz.mdoc.mso.MobileSecurityObjectParser
-import org.multipaz.sdjwt.credential.KeylessSdJwtVcCredential
+import org.multipaz.cbor.Simple
+import org.multipaz.compose.permissions.rememberBluetoothPermissionState
+import org.multipaz.compose.presentment.Presentment
+import org.multipaz.compose.prompt.PromptDialogs
+import org.multipaz.compose.qrcode.generateQrCode
+import org.multipaz.crypto.Crypto
+import org.multipaz.crypto.EcCurve
+import org.multipaz.crypto.X509Cert
+import org.multipaz.document.DocumentStore
+import org.multipaz.document.buildDocumentStore
+import org.multipaz.documenttype.DocumentTypeRepository
+import org.multipaz.documenttype.knowntypes.DrivingLicense
+import org.multipaz.mdoc.connectionmethod.MdocConnectionMethodBle
 import org.multipaz.mdoc.credential.MdocCredential
+import org.multipaz.mdoc.engagement.EngagementGenerator
+import org.multipaz.mdoc.mso.MobileSecurityObjectParser
+import org.multipaz.mdoc.mso.StaticAuthDataParser
+import org.multipaz.mdoc.role.MdocRole
+import org.multipaz.mdoc.transport.MdocTransportFactory
+import org.multipaz.mdoc.transport.MdocTransportOptions
+import org.multipaz.mdoc.transport.advertise
+import org.multipaz.mdoc.transport.waitForConnection
+import org.multipaz.models.digitalcredentials.DigitalCredentials
+import org.multipaz.models.presentment.MdocPresentmentMechanism
+import org.multipaz.models.presentment.PresentmentModel
+import org.multipaz.models.presentment.PresentmentSource
+import org.multipaz.models.presentment.SimplePresentmentSource
+import org.multipaz.models.provisioning.ProvisioningModel
+import org.multipaz.sdjwt.SdJwt
+import org.multipaz.sdjwt.credential.KeylessSdJwtVcCredential
+import org.multipaz.securearea.SecureArea
+import org.multipaz.securearea.SecureAreaRepository
+import org.multipaz.storage.Storage
+import org.multipaz.trustmanagement.TrustManager
 import org.multipaz.trustmanagement.TrustManagerLocal
 import org.multipaz.trustmanagement.TrustMetadata
 import org.multipaz.trustmanagement.TrustPointAlreadyExistsException
+import org.multipaz.util.Logger
+import org.multipaz.util.Platform
+import org.multipaz.util.UUID
+import org.multipaz.util.fromBase64Url
+import org.multipaz.util.toBase64Url
+import utopiasample.composeapp.generated.resources.Res
+import utopiasample.composeapp.generated.resources.profile
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import org.multipaz.securearea.CreateKeySettings as SA_CreateKeySettings
+import org.multipaz.document.AbstractDocumentMetadata
+import org.multipaz.document.DocumentMetadata
+import org.multipaz.provision.Display
+
 
 /**
  * Application singleton.
@@ -125,6 +118,9 @@ import org.multipaz.securearea.CreateKeySettings as SA_CreateKeySettings
  * Use [App.Companion.getInstance] to get an instance.
  */
 class App() {
+    val TAG="APP"
+    private  val OID4VCI_CREDENTIAL_OFFER_URL_SCHEME = "openid-credential-offer://"
+    private  val HAIP_URL_SCHEME = "haip://"
     lateinit var storage: Storage
     lateinit var documentTypeRepository: DocumentTypeRepository
     lateinit var secureAreaRepository: SecureAreaRepository
@@ -133,13 +129,31 @@ class App() {
     lateinit var readerTrustManager: TrustManager
     lateinit var presentmentModel: PresentmentModel
     lateinit var presentmentSource: PresentmentSource
+    lateinit var  provisioningModel: ProvisioningModel
 
+    private val credentialOffers = Channel<String>()
+    // Remove the Openid4vciModelEnroll dependency
+    val provisioningSupport= ProvisioningSupport()
+    
+    // Remove the enrollmentProvisioningModel variable - we'll use the single provisioningModel
+    
+    var display =false
     private val initLock = Mutex()
     private var initialized = false
 
     val appName = "UtopiaSample"
     val appIcon = Res.drawable.profile
 
+    
+    // Method to reset the provisioning model to idle state
+    private fun resetProvisioningModel() {
+        try {
+            provisioningModel.cancel()
+        } catch (e: Exception) {
+            Logger.w(TAG, "Error resetting provisioning model: ${e.message}")
+        }
+    }
+    
     @OptIn(ExperimentalTime::class)
     suspend fun init() {
         initLock.withLock {
@@ -153,6 +167,20 @@ class App() {
                 addDocumentType(DrivingLicense.getDocumentType())
             }
             documentStore = buildDocumentStore(storage = storage, secureAreaRepository = secureAreaRepository) {}
+            
+            // Initialize the single, persistent ProvisioningModel directly
+            provisioningModel = ProvisioningModel(
+                documentStore = documentStore,
+                secureArea = Platform.getSecureArea(),
+                httpClient = io.ktor.client.HttpClient() {
+                    followRedirects = false
+                },
+                promptModel = Platform.promptModel,
+                documentMetadataInitializer = ::initializeDocumentMetadata
+            )
+
+            Logger.i(TAG,"init provisioningModel is $provisioningModel")
+            
             if (documentStore.listDocuments().isEmpty()) {
                 Logger.i(appName,"create document")
 //                val now = Clock.System.now()
@@ -223,33 +251,9 @@ class App() {
             }catch (e: TrustPointAlreadyExistsException){
                 e.printStack()
             }
-// Or, if you have a Signed VICAL bytes:
-// tm.addVical(encodedSignedVical = ByteString(vicalBytes), metadata = TrustMetadata(displayName = "VICAL Source"))
 
             readerTrustManager = tm
 
-//            readerTrustManager = TrustManager().apply {
-//                addTrustPoint(
-//                    TrustPoint(
-//                        certificate = X509Cert.fromPem(
-//                            getReader_Root_Cert().trimIndent().trim()
-//                        ),
-//                        displayName = "OWF Multipaz TestApp",
-//                        displayIcon = null,
-//                        privacyPolicyUrl = "https://apps.multipaz.org"
-//                    )
-//                )
-//                addTrustPoint(
-//                    TrustPoint(
-//                        certificate = X509Cert(
-//                            "30820269308201efa0030201020210b7352f14308a2d40564006785270b0e7300a06082a8648ce3d0403033037310b300906035504060c0255533128302606035504030c1f76657269666965722e6d756c746970617a2e6f726720526561646572204341301e170d3235303631393232313633325a170d3330303631393232313633325a3037310b300906035504060c0255533128302606035504030c1f76657269666965722e6d756c746970617a2e6f7267205265616465722043413076301006072a8648ce3d020106052b81040022036200046baa02cc2f2b7c77f054e9907fcdd6c87110144f07acb2be371b2e7c90eb48580c5e3851bcfb777c88e533244069ff78636e54c7db5783edbc133cc1ff11bbabc3ff150f67392264c38710255743fee7cde7df6e55d7e9d5445d1bde559dcba8a381bf3081bc300e0603551d0f0101ff04040302010630120603551d130101ff040830060101ff02010030560603551d1f044f304d304ba049a047864568747470733a2f2f6769746875622e636f6d2f6f70656e77616c6c65742d666f756e646174696f6e2d6c6162732f6964656e746974792d63726564656e7469616c2f63726c301d0603551d0e04160414b18439852f4a6eeabfea62adbc51d081f7488729301f0603551d23041830168014b18439852f4a6eeabfea62adbc51d081f7488729300a06082a8648ce3d040303036800306502302a1f3bb0afdc31bcee73d3c5bf289245e76bd91a0fd1fb852b45fc75d3a98ba84430e6a91cbfc6b3f401c91382a43a64023100db22d2243644bb5188f2e0a102c0c167024fb6fe4a1d48ead55a6893af52367fb3cdbd66369aa689ecbeb5c84f063666".fromHex()
-//                        ),
-//                        displayName = "Multipaz Verifier",
-//                        displayIcon = null,
-//                        privacyPolicyUrl = "https://apps.multipaz.org"
-//                    )
-//                )
-//            }
             presentmentSource = SimplePresentmentSource(
                 documentStore = documentStore,
                 documentTypeRepository = documentTypeRepository,
@@ -272,6 +276,22 @@ class App() {
         }
     }
 
+    // Add the document metadata initializer function
+    private suspend fun initializeDocumentMetadata(
+        metadata: AbstractDocumentMetadata,
+        credentialDisplay: Display,
+        issuerDisplay: Display
+    ) {
+        (metadata as DocumentMetadata).setMetadata(
+            displayName = credentialDisplay.text,
+            typeDisplayName = credentialDisplay.text,
+            cardArt = credentialDisplay.logo
+                ?: ByteString(Res.readBytes("drawable/profile.png")),
+            issuerLogo = issuerDisplay.logo,
+            other = null
+        )
+    }
+
     @Composable
     fun Content() {
         var isInitialized = remember { mutableStateOf<Boolean>(false) }
@@ -291,16 +311,57 @@ class App() {
         }
 
         MaterialTheme {
-            MainApp()
+            val navController = rememberNavController()
+
+            // Stabilize dependencies to prevent unnecessary re-composition
+            val stableProvisioningModel = remember(provisioningModel) { provisioningModel }
+            val stableProvisioningSupport = remember(provisioningSupport) { provisioningSupport }
+
+            // Use Compose Navigation instead of conditional rendering
+            NavHost(navController = navController, startDestination = "main") {
+                composable("main") { 
+                    Logger.i(TAG, "NavHost: Rendering 'main' route")
+                    MainApp() 
+                }
+                composable("provisioning") {
+                    Logger.i(TAG, "NavHost: Rendering 'provisioning' route")
+                    ProvisioningTestScreen(
+                        this@App, 
+                        stableProvisioningModel, 
+                        stableProvisioningSupport,
+                        onNavigateToMain = { navController.navigate("main") }
+                    )
+                }
+            }
+            
+            // Use the working pattern from identity-credential project
+            LaunchedEffect(true) {
+                Logger.i(TAG, "LaunchedEffect: Credential processing loop started")
+                while (true) {
+                    Logger.i(TAG, "LaunchedEffect: Waiting for credential offer...")
+                    val credentialOffer = credentialOffers.receive()
+                    Logger.i(TAG, "LaunchedEffect: Received credential offer: $credentialOffer")
+                    Logger.i(TAG, "LaunchedEffect: Launching OpenID4VCI provisioning...")
+                    stableProvisioningModel.launchOpenID4VCIProvisioning(
+                        offerUri = credentialOffer,
+                        clientPreferences = ProvisioningSupport.OPENID4VCI_CLIENT_PREFERENCES,
+                        backend = stableProvisioningSupport
+                    )
+                    Logger.i(TAG, "LaunchedEffect: Provisioning launched, navigating to provisioning")
+                    navController.navigate("provisioning")
+                    Logger.i(TAG, "LaunchedEffect: Navigation completed")
+                }
+            }
+
         }
     }
 
     @Composable
     private fun MainApp() {
-        val selectedTab = remember { mutableStateOf(0) }
+        val selectedTab = remember { mutableStateOf(1) }
         val tabs = listOf("Explore", "Account")
         val deviceEngagement = remember { mutableStateOf<ByteString?>(null) }
-        
+
         Scaffold(
             bottomBar = {
                 TabRow(
@@ -383,7 +444,6 @@ class App() {
 
                 PresentmentModel.State.WAITING_FOR_SOURCE,
                 PresentmentModel.State.PROCESSING,
-                PresentmentModel.State.WAITING_FOR_DOCUMENT_SELECTION,
                 PresentmentModel.State.WAITING_FOR_CONSENT,
                 PresentmentModel.State.COMPLETED -> {
                     Presentment(
@@ -517,16 +577,41 @@ class App() {
      * Handle a link (either a app link, universal link, or custom URL schema link).
      */
     fun handleUrl(url: String) {
-        //TODO
-        CoroutineScope(Dispatchers.IO).launch {
-            // Initialize the backend provider and pass storage callback
-            OpenID4VCIEnrollment.handleDeepLink(url) { creds ->
-                storeIssuedCredentialsRaw(creds)
+        Logger.i(TAG, "handleUrl called with: $url")
+        Logger.i(TAG,"handleuir provisioningModel sate: ${provisioningModel.state.value}")
+        if (url.startsWith(OID4VCI_CREDENTIAL_OFFER_URL_SCHEME)
+            || url.startsWith(HAIP_URL_SCHEME)) {
+            val queryIndex = url.indexOf('?')
+            if (queryIndex >= 0) {
+                Logger.i(TAG,"Starting OpenID4VCI provisioning with: $url")
+                Logger.i(TAG,"OID4VCI_CREDENTIAL_OFFER_URL_SCHEME provisioningModel: $provisioningModel")
+                Logger.i(TAG, "handleUrl: Sending credential offer to channel...")
+                CoroutineScope(Dispatchers.Default).launch {
+                    Logger.i(TAG, "handleUrl: About to send to credentialOffers channel")
+                    credentialOffers.send(url)
+                    Logger.i(TAG, "handleUrl: Successfully sent to credentialOffers channel")
+                }
+                Logger.i(TAG, "handleUrl: Credential offer sent to channel, LaunchedEffect should process it")
+                // Navigate to ProvisioningTestScreen after starting provisioning (commented out, handled by LaunchedEffect)
+            }
+        } else if (url.startsWith(ProvisioningSupport.APP_LINK_BASE_URL)) {
+            Logger.i(TAG,"APP_LINK_BASE_URL provisioningModel: $provisioningModel")
+            Logger.i(TAG, "Processing app link invocation: $url")
+            
+            // Check if we have an active provisioning session (removed by assistant, re-added by user, then removed again)
+            // if (!isProvisioningActive()) { ... } // This check is currently NOT in the user's latest code.
+            
+            CoroutineScope(Dispatchers.Default).launch {
+                try {
+                    Logger.i(TAG, "handleUrl: About to process app link invocation")
+                    provisioningSupport.processAppLinkInvocation(url)
+                    Logger.i(TAG, "handleUrl: App link invocation processed successfully")
+                } catch (e: Exception) {
+                    Logger.e(TAG, "Error processing app link: ${e.message}", e)
+                    // resetProvisioningModel() // This call is currently NOT in the user's latest code.
+                }
             }
         }
-
-
-
     }
 
     /**
@@ -633,6 +718,7 @@ class App() {
         }
         Logger.i(appName, "Stored $storedCount credential(s) into document $documentId")
     }
+
 
     companion object {
         val promptModel = Platform.promptModel
