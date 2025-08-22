@@ -7,6 +7,7 @@ import io.ktor.util.encodeBase64
 import io.ktor.util.logging.Logger
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -26,6 +27,7 @@ import org.multipaz.provision.openid4vci.OpenID4VCIBackend
 import org.multipaz.provision.openid4vci.OpenID4VCIClientPreferences
 import org.multipaz.securearea.KeyAttestation
 import org.multipaz.util.toBase64Url
+import utopiasample.composeapp.generated.resources.Res
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
@@ -46,6 +48,10 @@ class ProvisioningSupport: OpenID4VCIBackend {
         const val APP_LINK_SERVER = "https://apps.multipaz.org"
         const val APP_LINK_BASE_URL = "$APP_LINK_SERVER/landing/"
 
+// Alternative custom scheme (security is lower)
+//        const val APP_LINK_SERVER = "multipaz-test-app"
+//        const val APP_LINK_BASE_URL = "${APP_LINK_SERVER}://landing/"
+
         private val localClientAssertionJwk = Json.parseToJsonElement("""
             {
                 "kty": "EC",
@@ -64,31 +70,20 @@ class ProvisioningSupport: OpenID4VCIBackend {
         private val localClientAssertionPrivateKey = EcPrivateKey.fromJwk(localClientAssertionJwk)
         private val localClientAssertionKeyId = localClientAssertionJwk["kid"]!!.jsonPrimitive.content
 
-        private val attestationCertificate = X509Cert.fromPem("""
-                -----BEGIN CERTIFICATE-----
-                MIIBxTCCAUugAwIBAgIJAOQTL9qcQopZMAoGCCqGSM49BAMDMDgxNjA0BgNVBAMT
-                LXVybjp1dWlkOjYwZjhjMTE3LWI2OTItNGRlOC04ZjdmLTYzNmZmODUyYmFhNjAe
-                Fw0yNDA5MjMyMjUxMzFaFw0zNDA5MjMyMjUxMzFaMDgxNjA0BgNVBAMTLXVybjp1
-                dWlkOjYwZjhjMTE3LWI2OTItNGRlOC04ZjdmLTYzNmZmODUyYmFhNjB2MBAGByqG
-                SM49AgEGBSuBBAAiA2IABN4D7fpNMAv4EtxyschbITpZ6iNH90rGapa6YEO/uhKn
-                C6VpPt5RUrJyhbvwAs0edCPthRfIZwfwl5GSEOS0mKGCXzWdRv4GGX/Y0m7EYypo
-                x+tzfnRTmoVX3v6OxQiapKMhMB8wHQYDVR0OBBYEFPqAK5EjiQbxFAeWt//DCaWt
-                C57aMAoGCCqGSM49BAMDA2gAMGUCMEO01fJKCy+iOTpaVp9LfO7jiXcXksn2BA22
-                reiR9ahDRdGNCrH1E3Q2umQAssSQbQIxAIz1FTHbZPcEbA5uE5lCZlRG/DQxlZhk
-                /rZrkPyXFhqEgfMnQ45IJ6f8Utlg+4Wiiw==
-                -----END CERTIFICATE-----
-            """.trimIndent()
-        )
+        private val attestationCertificate by lazy {
+            runBlocking {
+                X509Cert.fromPem(
+                    Res.readBytes("files/attestationCertificate.pem").decodeToString().trimIndent()
+                )
+            }
+        }
 
-        private val attestationPrivateKey = EcPrivateKey.fromPem("""
-            -----BEGIN PRIVATE KEY-----
-            ME4CAQAwEAYHKoZIzj0CAQYFK4EEACIENzA1AgEBBDBn7jeRC9u9de3kOkrt9lLT
-            Pvd1hflNq1FCgs7D+qbbwz1BQa4XXU0SjsV+R1GjnAY=
-            -----END PRIVATE KEY-----
-            """.trimIndent(),
-            attestationCertificate.ecPublicKey
-        )
-
+        private val attestationPrivateKey =
+            runBlocking {
+                EcPrivateKey.fromPem(Res.readBytes("files/attestationPrivateKey.pem").decodeToString().trimIndent().trimIndent(),
+                    attestationCertificate.ecPublicKey
+                )
+            }
         const val CLIENT_ID = "urn:uuid:418745b8-78a3-4810-88df-7898aff3ffb4"
 
         private val attestationId =

@@ -152,7 +152,6 @@ fun EvidenceRequestWebView(
     LaunchedEffect(stableEvidenceRequest.url) {
         // Launch the browser
         Logger.i(EvidenceRequestWebView, "EvidenceRequestWebView: About to open browser with URL: ${stableEvidenceRequest.url}")
-        // TODO: use Chrome Custom Tabs instead?
         uriHandler.openUri(stableEvidenceRequest.url)
         Logger.i(EvidenceRequestWebView, "EvidenceRequestWebView: Browser opened successfully")
         // Poll as a fallback

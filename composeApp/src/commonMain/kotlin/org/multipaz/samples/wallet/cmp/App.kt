@@ -109,7 +109,9 @@ import kotlin.time.ExperimentalTime
 import org.multipaz.securearea.CreateKeySettings as SA_CreateKeySettings
 import org.multipaz.document.AbstractDocumentMetadata
 import org.multipaz.document.DocumentMetadata
+import org.multipaz.documenttype.knowntypes.PhotoID
 import org.multipaz.provision.Display
+import org.multipaz.securearea.software.SoftwareSecureArea
 
 
 /**
@@ -134,7 +136,7 @@ class App() {
     private val credentialOffers = Channel<String>()
     // Remove the Openid4vciModelEnroll dependency
     val provisioningSupport= ProvisioningSupport()
-    
+
     // Remove the enrollmentProvisioningModel variable - we'll use the single provisioningModel
     
     var display =false
@@ -145,15 +147,6 @@ class App() {
     val appIcon = Res.drawable.profile
 
     
-    // Method to reset the provisioning model to idle state
-    private fun resetProvisioningModel() {
-        try {
-            provisioningModel.cancel()
-        } catch (e: Exception) {
-            Logger.w(TAG, "Error resetting provisioning model: ${e.message}")
-        }
-    }
-    
     @OptIn(ExperimentalTime::class)
     suspend fun init() {
         initLock.withLock {
@@ -162,9 +155,12 @@ class App() {
             }
             storage = Platform.nonBackedUpStorage
             secureArea = Platform.getSecureArea()
+//            storage = Platform.storage
+//            secureArea = SoftwareSecureArea.create(Platform.storage)
             secureAreaRepository = SecureAreaRepository.Builder().add(secureArea).build()
             documentTypeRepository = DocumentTypeRepository().apply {
                 addDocumentType(DrivingLicense.getDocumentType())
+                addDocumentType(PhotoID.getDocumentType())
             }
             documentStore = buildDocumentStore(storage = storage, secureAreaRepository = secureAreaRepository) {}
             
@@ -183,55 +179,6 @@ class App() {
             
             if (documentStore.listDocuments().isEmpty()) {
                 Logger.i(appName,"create document")
-//                val now = Clock.System.now()
-//                val signedAt = now
-//                val validFrom = now
-//                val validUntil = now + 365.days
-//                val iacaCert = X509Cert.fromPem(
-//                    getIaca_Cert()
-//                )
-//                Logger.i(appName, iacaCert.toPem())
-//                val iacaKey = EcPrivateKey.fromPem(
-//                    iaca_private_key,
-//                    iacaCert.ecPublicKey
-//                )
-//                val dsKey = Crypto.createEcPrivateKey(EcCurve.P256)
-//                val dsCert = MdocUtil.generateDsCertificate(
-//                    iacaCert = iacaCert,
-//                    iacaKey = iacaKey,
-//                    dsKey = dsKey.publicKey,
-//                    subject = X500Name.fromName(name = "CN=Test DS Key"),
-//                    serial = ASN1Integer.fromRandom(numBits = 128),
-//                    validFrom = validFrom,
-//                    validUntil = validUntil
-//                )
-                val profile = ByteString(
-                    getDrawableResourceBytes(
-                        getSystemResourceEnvironment(),
-                        Res.drawable.profile,
-                    )
-                )
-                val document = documentStore.createDocument(
-                    displayName ="Tom Lee's Utopia Membership",
-                    typeDisplayName = "Membership Card",
-                    cardArt = profile,
-                    other = UtopiaMemberInfo().toJsonString().encodeToByteString(),
-                )
-//                val mdocCredential =
-//                    DrivingLicense.getDocumentType().createMdocCredentialWithSampleData(
-//                        document = document,
-//                        secureArea = secureArea,
-//                        createKeySettings = CreateKeySettings(
-//                            algorithm = Algorithm.ESP256,
-//                            nonce = "Challenge".encodeToByteString(),
-//                            userAuthenticationRequired = true
-//                        ),
-//                        dsKey = dsKey,
-//                        dsCertChain = X509CertChain(listOf(dsCert)),
-//                        signedAt = signedAt,
-//                        validFrom = validFrom,
-//                        validUntil = validUntil,
-//                    )
             }else{
                 Logger.i(appName,"document already exists")
             }
@@ -240,7 +187,27 @@ class App() {
             val tm = TrustManagerLocal(storage = storage, identifier = "reader")
             try {
                 tm.addX509Cert(
-                    certificate = X509Cert.fromPem(getReader_Root_Cert().trimIndent().trim()),
+                    certificate = X509Cert.fromPem( getTestAppReaderRootCert().trimIndent().trim()),
+                    metadata = TrustMetadata(
+                        displayName = "Multipaz Verifier",
+                        displayIcon = null,
+                        privacyPolicyUrl = "https://apps.multipaz.org",
+                        testOnly = true
+                    )
+                )
+
+                tm.addX509Cert(
+                    certificate = X509Cert.fromPem(getReaderRootCert().trimIndent().trim()),
+                    metadata = TrustMetadata(
+                        displayName = "Multipaz Verifier",
+                        displayIcon = null,
+                        privacyPolicyUrl = "https://apps.multipaz.org",
+                        testOnly = true
+                    )
+                )
+
+                tm.addX509Cert(
+                    certificate = X509Cert.fromPem(getReaderRootCertForUntrustDevice().trimIndent().trim()),
                     metadata = TrustMetadata(
                         displayName = "Multipaz Verifier",
                         displayIcon = null,
@@ -260,10 +227,10 @@ class App() {
                 readerTrustManager = readerTrustManager,
                 preferSignatureToKeyAgreement = true,
                 // Match domains used when storing credentials via OpenID4VCI
-                domainMdocSignature = "openid4vci",
-                domainMdocKeyAgreement = "openid4vci",
-                domainKeylessSdJwt = "openid4vci",
-                domainKeyBoundSdJwt = "openid4vci",
+                domainMdocSignature = TestAppUtils.CREDENTIAL_DOMAIN_MDOC_USER_AUTH,
+                domainMdocKeyAgreement = TestAppUtils.CREDENTIAL_DOMAIN_MDOC_MAC_USER_AUTH,
+                domainKeylessSdJwt = TestAppUtils.CREDENTIAL_DOMAIN_SDJWT_KEYLESS,
+                domainKeyBoundSdJwt =TestAppUtils.CREDENTIAL_DOMAIN_SDJWT_USER_AUTH
             )
             if (DigitalCredentials.Default.available) {
                 //The credentials will still exist in your document store and can be used for other presentation mechanisms like proximity sharing (NFC/BLE), but they won't be accessible through the standardized digital credentials infrastructure that Android provides.
@@ -432,6 +399,7 @@ class App() {
                 PresentmentModel.State.CONNECTING -> {
                     LaunchedEffect(Unit) {
                         val hasCred = hasAnyUsableCredential()
+                        Logger.i(TAG, "hasAnyUsableCredential: $hasCred")
                         if (!hasCred) {
                             noCredentialDialog.value = true
                             presentmentModel.reset()
@@ -442,7 +410,9 @@ class App() {
                     }
                 }
 
-                PresentmentModel.State.WAITING_FOR_SOURCE,
+                PresentmentModel.State.WAITING_FOR_SOURCE ->{
+                    presentmentModel.setSource(presentmentSource)
+                }
                 PresentmentModel.State.PROCESSING,
                 PresentmentModel.State.WAITING_FOR_CONSENT,
                 PresentmentModel.State.COMPLETED -> {
