@@ -17,7 +17,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -33,7 +32,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import io.ktor.utils.io.core.toByteArray
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -43,7 +41,6 @@ import kotlinx.datetime.Clock
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.encodeToByteString
 import utopiasample.composeapp.generated.resources.Res
-import utopiasample.composeapp.generated.resources.compose_multiplatform
 import org.jetbrains.compose.resources.painterResource
 import org.multipaz.asn1.ASN1Integer
 import org.multipaz.cbor.Simple
@@ -82,14 +79,12 @@ import org.multipaz.trustmanagement.TrustManager
 import org.multipaz.trustmanagement.TrustPoint
 import org.multipaz.util.Platform
 import org.multipaz.util.UUID
-import org.multipaz.util.fromHex
 import org.multipaz.util.toBase64Url
 import kotlin.time.Duration.Companion.days
 import utopiasample.composeapp.generated.resources.profile
 import org.jetbrains.compose.resources.getDrawableResourceBytes
 import org.jetbrains.compose.resources.getSystemResourceEnvironment
 import org.multipaz.crypto.EcPrivateKey
-import org.multipaz.crypto.EcPublicKey
 import org.multipaz.util.Logger
 
 /**
@@ -132,11 +127,11 @@ class App() {
                 val validFrom = now
                 val validUntil = now + 365.days
                 val iacaCert = X509Cert.fromPem(
-                    getIaca_Cert()
+                    getIacaCert()
                 )
                 Logger.i(appName, iacaCert.toPem())
                 val iacaKey = EcPrivateKey.fromPem(
-                    iaca_private_key,
+                    getIacaPrivateKey(),
                     iacaCert.ecPublicKey
                 )
                 val dsKey = Crypto.createEcPrivateKey(EcCurve.P256)
@@ -184,19 +179,29 @@ class App() {
                 addTrustPoint(
                     TrustPoint(
                         certificate = X509Cert.fromPem(
-                            getReader_Root_Cert().trimIndent().trim()
+                            getTestAppReaderRootCert().trimIndent().trim()
                         ),
-                        displayName = "OWF Multipaz TestApp",
+                        displayName = "OWF Multipaz Test App Reader",
                         displayIcon = null,
                         privacyPolicyUrl = "https://apps.multipaz.org"
                     )
                 )
                 addTrustPoint(
                     TrustPoint(
-                        certificate = X509Cert(
-                            "30820269308201efa0030201020210b7352f14308a2d40564006785270b0e7300a06082a8648ce3d0403033037310b300906035504060c0255533128302606035504030c1f76657269666965722e6d756c746970617a2e6f726720526561646572204341301e170d3235303631393232313633325a170d3330303631393232313633325a3037310b300906035504060c0255533128302606035504030c1f76657269666965722e6d756c746970617a2e6f7267205265616465722043413076301006072a8648ce3d020106052b81040022036200046baa02cc2f2b7c77f054e9907fcdd6c87110144f07acb2be371b2e7c90eb48580c5e3851bcfb777c88e533244069ff78636e54c7db5783edbc133cc1ff11bbabc3ff150f67392264c38710255743fee7cde7df6e55d7e9d5445d1bde559dcba8a381bf3081bc300e0603551d0f0101ff04040302010630120603551d130101ff040830060101ff02010030560603551d1f044f304d304ba049a047864568747470733a2f2f6769746875622e636f6d2f6f70656e77616c6c65742d666f756e646174696f6e2d6c6162732f6964656e746974792d63726564656e7469616c2f63726c301d0603551d0e04160414b18439852f4a6eeabfea62adbc51d081f7488729301f0603551d23041830168014b18439852f4a6eeabfea62adbc51d081f7488729300a06082a8648ce3d040303036800306502302a1f3bb0afdc31bcee73d3c5bf289245e76bd91a0fd1fb852b45fc75d3a98ba84430e6a91cbfc6b3f401c91382a43a64023100db22d2243644bb5188f2e0a102c0c167024fb6fe4a1d48ead55a6893af52367fb3cdbd66369aa689ecbeb5c84f063666".fromHex()
+                        certificate = X509Cert.fromPem(
+                            getReaderRootCert().trimIndent().trim()
                         ),
-                        displayName = "Multipaz Verifier",
+                        displayName = "Multipaz Identity Reader (Trusted Devices)",
+                        displayIcon = null,
+                        privacyPolicyUrl = "https://apps.multipaz.org"
+                    )
+                )
+                addTrustPoint(
+                    TrustPoint(
+                        certificate = X509Cert.fromPem(
+                            getReaderRootCertForUntrustDevice().trimIndent().trim()
+                        ),
+                        displayName = "Multipaz Identity Reader (UnTrusted Devices)",
                         displayIcon = null,
                         privacyPolicyUrl = "https://apps.multipaz.org"
                     )
@@ -411,7 +416,7 @@ class App() {
             if (deviceEngagement.value != null) {
                 val mdocUrl = "mdoc:" + deviceEngagement.value!!.toByteArray().toBase64Url()
                 val qrCodeBitmap = remember { generateQrCode(mdocUrl) }
-                Spacer(modifier = Modifier.height(128.dp))
+                Spacer(modifier = Modifier.height(256.dp))
                 Text(text = "Present QR code to mdoc reader")
                 Image(
                     modifier = Modifier.fillMaxWidth(),
