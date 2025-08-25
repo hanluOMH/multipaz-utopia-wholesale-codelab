@@ -192,7 +192,7 @@ class App() {
                         certificate = X509Cert.fromPem(
                             getReaderRootCert().trimIndent().trim()
                         ),
-                        displayName = "OWF Multipaz Reader App",
+                        displayName = "Multipaz Identity Reader (Trusted Devices)",
                         displayIcon = null,
                         privacyPolicyUrl = "https://apps.multipaz.org"
                     )
@@ -202,7 +202,7 @@ class App() {
                         certificate = X509Cert.fromPem(
                             getReaderRootCertForUntrustDevice().trimIndent().trim()
                         ),
-                        displayName = "OWF Multipaz Reader App",
+                        displayName = "Multipaz Identity Reader (UnTrusted Devices)",
                         displayIcon = null,
                         privacyPolicyUrl = "https://apps.multipaz.org"
                     )
