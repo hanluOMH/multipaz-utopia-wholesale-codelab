@@ -127,11 +127,12 @@ class App() {
                 val validFrom = now
                 val validUntil = now + 365.days
                 val iacaCert = X509Cert.fromPem(
-                    getIacaCert()
+                    Res.readBytes("files/iaca_certificate.pem").decodeToString()
+
                 )
                 Logger.i(appName, iacaCert.toPem())
                 val iacaKey = EcPrivateKey.fromPem(
-                    getIacaPrivateKey(),
+                    Res.readBytes("files/iaca_private_key.pem").decodeToString().trimIndent().trim(),
                     iacaCert.ecPublicKey
                 )
                 val dsKey = Crypto.createEcPrivateKey(EcCurve.P256)
@@ -180,7 +181,7 @@ class App() {
                 addTrustPoint(
                     TrustPoint(
                         certificate = X509Cert.fromPem(
-                            getTestAppReaderRootCert().trimIndent().trim()
+                            Res.readBytes("files/test_app_reader_root_certificate.pem").decodeToString().trimIndent().trim()
                         ),
                         displayName = "OWF Test App Reader",
                         displayIcon = null,
@@ -190,7 +191,8 @@ class App() {
                 addTrustPoint(
                     TrustPoint(
                         certificate = X509Cert.fromPem(
-                            getReaderRootCert().trimIndent().trim()
+                            Res.readBytes("files/reader_root_certificate.pem").decodeToString()
+                                .trimIndent().trim()
                         ),
                         displayName = "Multipaz Identity Reader (Trusted Devices)",
                         displayIcon = null,
@@ -200,7 +202,7 @@ class App() {
                 addTrustPoint(
                     TrustPoint(
                         certificate = X509Cert.fromPem(
-                            getReaderRootCertForUntrustDevice().trimIndent().trim()
+                            Res.readBytes("files/reader_root_certificate_for_untrust_device.pem").decodeToString().trimIndent().trim()
                         ),
                         displayName = "Multipaz Identity Reader (UnTrusted Devices)",
                         displayIcon = null,
