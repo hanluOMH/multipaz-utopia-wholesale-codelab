@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.ktor.utils.io.printStack
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -85,7 +86,12 @@ import utopiasample.composeapp.generated.resources.profile
 import org.jetbrains.compose.resources.getDrawableResourceBytes
 import org.jetbrains.compose.resources.getSystemResourceEnvironment
 import org.multipaz.crypto.EcPrivateKey
+import org.multipaz.trustmanagement.TrustManagerLocal
+import org.multipaz.trustmanagement.TrustMetadata
+import org.multipaz.trustmanagement.TrustPointAlreadyExistsException
 import org.multipaz.util.Logger
+import kotlin.time.Clock.System.now
+import kotlin.time.ExperimentalTime
 
 /**
  * Application singleton.
@@ -108,6 +114,7 @@ class App() {
     val appName = "UtopiaSample"
     val appIcon = Res.drawable.profile
 
+    @OptIn(ExperimentalTime::class)
     suspend fun init() {
         initLock.withLock {
             if (initialized) {
@@ -122,7 +129,7 @@ class App() {
             documentStore = buildDocumentStore(storage = storage, secureAreaRepository = secureAreaRepository) {}
             if (documentStore.listDocuments().isEmpty()) {
                 Logger.i(appName,"create document")
-                val now = Clock.System.now()
+                val now = now()
                 val signedAt = now
                 val validFrom = now
                 val validUntil = now + 365.days
@@ -175,38 +182,45 @@ class App() {
                 Logger.i(appName,"document already exists")
             }
             presentmentModel = PresentmentModel().apply { setPromptModel(promptModel) }
-            readerTrustManager = TrustManager().apply {
-                addTrustPoint(
-                    TrustPoint(
+
+            val readerTrustManager = TrustManagerLocal(storage = storage, identifier = "reader")
+            try {
+                readerTrustManager.apply{
+                    addX509Cert(
                         certificate = X509Cert.fromPem(
                             Res.readBytes("files/test_app_reader_root_certificate.pem").decodeToString().trimIndent().trim()
                         ),
-                        displayName = "OWF Multipaz Test App Reader",
-                        displayIcon = null,
-                        privacyPolicyUrl = "https://apps.multipaz.org"
+                        metadata = TrustMetadata(
+                            displayName = "OWF Multipaz Test App Reader",
+                            displayIcon = null,
+                            privacyPolicyUrl = "https://apps.multipaz.org"
+                        )
                     )
-                )
-                addTrustPoint(
-                    TrustPoint(
+                    addX509Cert(
                         certificate = X509Cert.fromPem(
-                            Res.readBytes("files/reader_root_certificate.pem").decodeToString().trimIndent().trim()
+                            Res.readBytes("files/reader_root_certificate.pem").decodeToString().trimIndent().trim(),
                         ),
-                        displayName = "Multipaz Identity Reader (Trusted Devices)",
-                        displayIcon = null,
-                        privacyPolicyUrl = "https://apps.multipaz.org"
+                        metadata = TrustMetadata(
+                            displayName = "Multipaz Identity Reader (Trusted Devices)",
+                            displayIcon = null,
+                            privacyPolicyUrl = "https://apps.multipaz.org"
+                        )
                     )
-                )
-                addTrustPoint(
-                    TrustPoint(
+                    addX509Cert(
                         certificate = X509Cert.fromPem(
-                            Res.readBytes("files/reader_root_certificate.pem").decodeToString().trimIndent().trim()
+                            Res.readBytes("files/reader_root_certificate_for_untrust_device.pem").decodeToString().trimIndent().trim(),
                         ),
-                        displayName = "Multipaz Identity Reader (UnTrusted Devices)",
-                        displayIcon = null,
-                        privacyPolicyUrl = "https://apps.multipaz.org"
+                        metadata = TrustMetadata(
+                            displayName = "Multipaz Identity Reader (UnTrusted Devices)",
+                            displayIcon = null,
+                            privacyPolicyUrl = "https://apps.multipaz.org"
+                        )
                     )
-                )
+                }
+            } catch (e: TrustPointAlreadyExistsException) {
+                e.printStackTrace()
             }
+
             presentmentSource = SimplePresentmentSource(
                 documentStore = documentStore,
                 documentTypeRepository = documentTypeRepository,
