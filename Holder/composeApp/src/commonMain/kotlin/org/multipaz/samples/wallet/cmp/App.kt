@@ -1,7 +1,5 @@
 package org.multipaz.samples.wallet.cmp
 
-// Add navigation imports
-
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -20,6 +18,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -58,6 +57,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.compose.resources.getDrawableResourceBytes
 import org.jetbrains.compose.resources.getSystemResourceEnvironment
+import utopiasample.composeapp.generated.resources.Res
 import org.jetbrains.compose.resources.painterResource
 import org.multipaz.cbor.Cbor
 import org.multipaz.cbor.Simple
@@ -104,6 +104,15 @@ import org.multipaz.util.fromBase64Url
 import org.multipaz.util.toBase64Url
 import utopiasample.composeapp.generated.resources.Res
 import utopiasample.composeapp.generated.resources.profile
+import org.jetbrains.compose.resources.getDrawableResourceBytes
+import org.jetbrains.compose.resources.getSystemResourceEnvironment
+import org.multipaz.crypto.EcPrivateKey
+import org.multipaz.trustmanagement.TrustManagerLocal
+import org.multipaz.trustmanagement.TrustMetadata
+import org.multipaz.trustmanagement.TrustPointAlreadyExistsException
+import org.multipaz.util.Logger
+import kotlin.time.Clock.System.now
+import kotlin.time.ExperimentalTime
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import org.multipaz.securearea.CreateKeySettings as SA_CreateKeySettings
@@ -138,7 +147,7 @@ class App() {
     val provisioningSupport= ProvisioningSupport()
 
     // Remove the enrollmentProvisioningModel variable - we'll use the single provisioningModel
-    
+
     var display =false
     private val initLock = Mutex()
     private var initialized = false
@@ -146,7 +155,7 @@ class App() {
     val appName = "UtopiaSample"
     val appIcon = Res.drawable.profile
 
-    
+
     @OptIn(ExperimentalTime::class)
     suspend fun init() {
         initLock.withLock {
@@ -163,7 +172,7 @@ class App() {
                 addDocumentType(PhotoID.getDocumentType())
             }
             documentStore = buildDocumentStore(storage = storage, secureAreaRepository = secureAreaRepository) {}
-            
+
             // Initialize the single, persistent ProvisioningModel directly
             provisioningModel = ProvisioningModel(
                 documentStore = documentStore,
@@ -176,7 +185,7 @@ class App() {
             )
 
             Logger.i(TAG,"init provisioningModel is $provisioningModel")
-            
+
             if (documentStore.listDocuments().isEmpty()) {
                 Logger.i(appName,"create document")
             }else{
@@ -286,21 +295,21 @@ class App() {
 
             // Use Compose Navigation instead of conditional rendering
             NavHost(navController = navController, startDestination = "main") {
-                composable("main") { 
+                composable("main") {
                     Logger.i(TAG, "NavHost: Rendering 'main' route")
-                    MainApp() 
+                    MainApp()
                 }
                 composable("provisioning") {
                     Logger.i(TAG, "NavHost: Rendering 'provisioning' route")
                     ProvisioningTestScreen(
-                        this@App, 
-                        stableProvisioningModel, 
+                        this@App,
+                        stableProvisioningModel,
                         stableProvisioningSupport,
                         onNavigateToMain = { navController.navigate("main") }
                     )
                 }
             }
-            
+
             // Use the working pattern from identity-credential project
             LaunchedEffect(true) {
                 Logger.i(TAG, "LaunchedEffect: Credential processing loop started")
@@ -515,7 +524,7 @@ class App() {
             if (deviceEngagement.value != null) {
                 val mdocUrl = "mdoc:" + deviceEngagement.value!!.toByteArray().toBase64Url()
                 val qrCodeBitmap = remember { generateQrCode(mdocUrl) }
-                Spacer(modifier = Modifier.height(128.dp))
+                Spacer(modifier = Modifier.height(256.dp))
                 Text(text = "Present QR code to mdoc reader")
                 Image(
                     modifier = Modifier.fillMaxWidth(),
@@ -567,10 +576,10 @@ class App() {
         } else if (url.startsWith(ProvisioningSupport.APP_LINK_BASE_URL)) {
             Logger.i(TAG,"APP_LINK_BASE_URL provisioningModel: $provisioningModel")
             Logger.i(TAG, "Processing app link invocation: $url")
-            
+
             // Check if we have an active provisioning session (removed by assistant, re-added by user, then removed again)
             // if (!isProvisioningActive()) { ... } // This check is currently NOT in the user's latest code.
-            
+
             CoroutineScope(Dispatchers.Default).launch {
                 try {
                     Logger.i(TAG, "handleUrl: About to process app link invocation")

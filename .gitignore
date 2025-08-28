@@ -5,8 +5,9 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-# IntelliJ IDEA
+# IntelliJ IDEA / Android Studio
 .idea/
+**/.idea/
 *.iws
 *.iml
 *.ipr
@@ -271,3 +272,9 @@ node_modules/
 # Temporary folders
 tmp/
 temp/ 
+
+# Kotlin build cache
+Holder/.kotlin/ 
+
+# IntelliJ IDEA / Android Studio
+.idea/ 
