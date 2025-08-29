@@ -81,7 +81,12 @@ import org.jetbrains.compose.resources.getDrawableResourceBytes
 import org.jetbrains.compose.resources.getSystemResourceEnvironment
 import org.multipaz.crypto.EcPrivateKey
 import org.multipaz.mdoc.transport.MdocTransport
+import org.multipaz.trustmanagement.TrustManagerLocal
+import org.multipaz.trustmanagement.TrustMetadata
+import org.multipaz.trustmanagement.TrustPointAlreadyExistsException
 import org.multipaz.util.Logger
+import kotlin.time.Clock.System.now
+import kotlin.time.ExperimentalTime
 
 /**
  * Application singleton.
@@ -94,7 +99,7 @@ class App() {
     lateinit var secureAreaRepository: SecureAreaRepository
     lateinit var secureArea: SecureArea
     lateinit var documentStore: DocumentStore
-    lateinit var readerTrustManager: TrustManager
+    lateinit var readerTrustManager: TrustManagerLocal
     lateinit var presentmentModel: PresentmentModel
     lateinit var presentmentSource: PresentmentSource
 
@@ -108,6 +113,7 @@ class App() {
     val appName = "UtopiaSample"
     val appIcon = Res.drawable.profile
 
+    @OptIn(ExperimentalTime::class)
     suspend fun init() {
         initLock.withLock {
             if (initialized) {
@@ -122,13 +128,12 @@ class App() {
             documentStore = buildDocumentStore(storage = storage, secureAreaRepository = secureAreaRepository) {}
             if (documentStore.listDocuments().isEmpty()) {
                 Logger.i(appName,"create document")
-                val now = Clock.System.now()
+                val now = now()
                 val signedAt = now
                 val validFrom = now
                 val validUntil = now + 365.days
                 val iacaCert = X509Cert.fromPem(
                     Res.readBytes("files/iaca_certificate.pem").decodeToString()
-
                 )
                 Logger.i(appName, iacaCert.toPem())
                 val iacaKey = EcPrivateKey.fromPem(
@@ -177,39 +182,44 @@ class App() {
             }
             //TODO: presentmentModel = PresentmentModel().apply { setPromptModel(promptModel) }
 
-            readerTrustManager = TrustManager().apply {
-                addTrustPoint(
-                    TrustPoint(
+            readerTrustManager = TrustManagerLocal(storage = storage, identifier = "reader")
+            try {
+                readerTrustManager.apply{
+                    addX509Cert(
                         certificate = X509Cert.fromPem(
                             Res.readBytes("files/test_app_reader_root_certificate.pem").decodeToString().trimIndent().trim()
                         ),
-                        displayName = "OWF Test App Reader",
-                        displayIcon = null,
-                        privacyPolicyUrl = "https://apps.multipaz.org"
+                        metadata = TrustMetadata(
+                            displayName = "OWF Multipaz Test App Reader",
+                            displayIcon = null,
+                            privacyPolicyUrl = "https://apps.multipaz.org"
+                        )
                     )
-                )
-                addTrustPoint(
-                    TrustPoint(
+                    addX509Cert(
                         certificate = X509Cert.fromPem(
-                            Res.readBytes("files/reader_root_certificate.pem").decodeToString()
-                                .trimIndent().trim()
+                            Res.readBytes("files/reader_root_certificate.pem").decodeToString().trimIndent().trim(),
                         ),
-                        displayName = "Multipaz Identity Reader (Trusted Devices)",
-                        displayIcon = null,
-                        privacyPolicyUrl = "https://apps.multipaz.org"
+                        metadata = TrustMetadata(
+                            displayName = "Multipaz Identity Reader (Trusted Devices)",
+                            displayIcon = null,
+                            privacyPolicyUrl = "https://apps.multipaz.org"
+                        )
                     )
-                )
-                addTrustPoint(
-                    TrustPoint(
+                    addX509Cert(
                         certificate = X509Cert.fromPem(
-                            Res.readBytes("files/reader_root_certificate_for_untrust_device.pem").decodeToString().trimIndent().trim()
+                            Res.readBytes("files/reader_root_certificate_for_untrust_device.pem").decodeToString().trimIndent().trim(),
                         ),
-                        displayName = "Multipaz Identity Reader (UnTrusted Devices)",
-                        displayIcon = null,
-                        privacyPolicyUrl = "https://apps.multipaz.org"
+                        metadata = TrustMetadata(
+                            displayName = "Multipaz Identity Reader (UnTrusted Devices)",
+                            displayIcon = null,
+                            privacyPolicyUrl = "https://apps.multipaz.org"
+                        )
                     )
-                )
+                }
+            } catch (e: TrustPointAlreadyExistsException) {
+                e.printStackTrace()
             }
+
             presentmentSource = SimplePresentmentSource(
                 documentStore = documentStore,
                 documentTypeRepository = documentTypeRepository,
