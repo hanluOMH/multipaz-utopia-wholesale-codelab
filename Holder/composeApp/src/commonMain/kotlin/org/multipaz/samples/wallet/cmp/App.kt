@@ -18,7 +18,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -46,7 +45,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.bytestring.encodeToByteString
 import kotlinx.serialization.json.JsonArray
@@ -55,9 +53,6 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.jetbrains.compose.resources.getDrawableResourceBytes
-import org.jetbrains.compose.resources.getSystemResourceEnvironment
-import utopiasample.composeapp.generated.resources.Res
 import org.jetbrains.compose.resources.painterResource
 import org.multipaz.cbor.Cbor
 import org.multipaz.cbor.Simple
@@ -68,10 +63,13 @@ import org.multipaz.compose.qrcode.generateQrCode
 import org.multipaz.crypto.Crypto
 import org.multipaz.crypto.EcCurve
 import org.multipaz.crypto.X509Cert
+import org.multipaz.document.AbstractDocumentMetadata
+import org.multipaz.document.DocumentMetadata
 import org.multipaz.document.DocumentStore
 import org.multipaz.document.buildDocumentStore
 import org.multipaz.documenttype.DocumentTypeRepository
 import org.multipaz.documenttype.knowntypes.DrivingLicense
+import org.multipaz.documenttype.knowntypes.PhotoID
 import org.multipaz.mdoc.connectionmethod.MdocConnectionMethodBle
 import org.multipaz.mdoc.credential.MdocCredential
 import org.multipaz.mdoc.engagement.EngagementGenerator
@@ -88,6 +86,7 @@ import org.multipaz.models.presentment.PresentmentModel
 import org.multipaz.models.presentment.PresentmentSource
 import org.multipaz.models.presentment.SimplePresentmentSource
 import org.multipaz.models.provisioning.ProvisioningModel
+import org.multipaz.provision.Display
 import org.multipaz.sdjwt.SdJwt
 import org.multipaz.sdjwt.credential.KeylessSdJwtVcCredential
 import org.multipaz.securearea.SecureArea
@@ -104,23 +103,9 @@ import org.multipaz.util.fromBase64Url
 import org.multipaz.util.toBase64Url
 import utopiasample.composeapp.generated.resources.Res
 import utopiasample.composeapp.generated.resources.profile
-import org.jetbrains.compose.resources.getDrawableResourceBytes
-import org.jetbrains.compose.resources.getSystemResourceEnvironment
-import org.multipaz.crypto.EcPrivateKey
-import org.multipaz.trustmanagement.TrustManagerLocal
-import org.multipaz.trustmanagement.TrustMetadata
-import org.multipaz.trustmanagement.TrustPointAlreadyExistsException
-import org.multipaz.util.Logger
-import kotlin.time.Clock.System.now
-import kotlin.time.ExperimentalTime
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import org.multipaz.securearea.CreateKeySettings as SA_CreateKeySettings
-import org.multipaz.document.AbstractDocumentMetadata
-import org.multipaz.document.DocumentMetadata
-import org.multipaz.documenttype.knowntypes.PhotoID
-import org.multipaz.provision.Display
-import org.multipaz.securearea.software.SoftwareSecureArea
 
 
 /**
@@ -195,35 +180,38 @@ class App() {
 
             val tm = TrustManagerLocal(storage = storage, identifier = "reader")
             try {
-                tm.addX509Cert(
-                    certificate = X509Cert.fromPem( getTestAppReaderRootCert().trimIndent().trim()),
-                    metadata = TrustMetadata(
-                        displayName = "Multipaz Verifier",
-                        displayIcon = null,
-                        privacyPolicyUrl = "https://apps.multipaz.org",
-                        testOnly = true
+                tm.apply{
+                    addX509Cert(
+                        certificate = X509Cert.fromPem(
+                            Res.readBytes("files/test_app_reader_root_certificate.pem").decodeToString().trimIndent().trim()
+                        ),
+                        metadata = TrustMetadata(
+                            displayName = "OWF Multipaz Test App Reader",
+                            displayIcon = null,
+                            privacyPolicyUrl = "https://apps.multipaz.org"
+                        )
                     )
-                )
-
-                tm.addX509Cert(
-                    certificate = X509Cert.fromPem(getReaderRootCert().trimIndent().trim()),
-                    metadata = TrustMetadata(
-                        displayName = "Multipaz Verifier",
-                        displayIcon = null,
-                        privacyPolicyUrl = "https://apps.multipaz.org",
-                        testOnly = true
+                    addX509Cert(
+                        certificate = X509Cert.fromPem(
+                            Res.readBytes("files/reader_root_certificate.pem").decodeToString().trimIndent().trim(),
+                        ),
+                        metadata = TrustMetadata(
+                            displayName = "Multipaz Identity Reader (Trusted Devices)",
+                            displayIcon = null,
+                            privacyPolicyUrl = "https://apps.multipaz.org"
+                        )
                     )
-                )
-
-                tm.addX509Cert(
-                    certificate = X509Cert.fromPem(getReaderRootCertForUntrustDevice().trimIndent().trim()),
-                    metadata = TrustMetadata(
-                        displayName = "Multipaz Verifier",
-                        displayIcon = null,
-                        privacyPolicyUrl = "https://apps.multipaz.org",
-                        testOnly = true
+                    addX509Cert(
+                        certificate = X509Cert.fromPem(
+                            Res.readBytes("files/reader_root_certificate_for_untrust_device.pem").decodeToString().trimIndent().trim(),
+                        ),
+                        metadata = TrustMetadata(
+                            displayName = "Multipaz Identity Reader (UnTrusted Devices)",
+                            displayIcon = null,
+                            privacyPolicyUrl = "https://apps.multipaz.org"
+                        )
                     )
-                )
+                }
             }catch (e: TrustPointAlreadyExistsException){
                 e.printStack()
             }
@@ -241,13 +229,6 @@ class App() {
                 domainKeylessSdJwt = TestAppUtils.CREDENTIAL_DOMAIN_SDJWT_KEYLESS,
                 domainKeyBoundSdJwt =TestAppUtils.CREDENTIAL_DOMAIN_SDJWT_USER_AUTH
             )
-            if (DigitalCredentials.Default.available) {
-                //The credentials will still exist in your document store and can be used for other presentation mechanisms like proximity sharing (NFC/BLE), but they won't be accessible through the standardized digital credentials infrastructure that Android provides.
-                DigitalCredentials.Default.startExportingCredentials(
-                    documentStore = documentStore,
-                    documentTypeRepository = documentTypeRepository
-                )
-            }
             initialized = true
         }
     }
