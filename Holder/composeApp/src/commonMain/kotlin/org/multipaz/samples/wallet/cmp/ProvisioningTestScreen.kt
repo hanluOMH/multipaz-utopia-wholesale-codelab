@@ -19,13 +19,12 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.multipaz.models.provisioning.ProvisioningModel
-import org.multipaz.provision.AuthorizationChallenge
-import org.multipaz.provision.AuthorizationResponse
-
 import org.multipaz.util.Logger
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import org.multipaz.provisioning.AuthorizationChallenge
+import org.multipaz.provisioning.AuthorizationResponse
 
 @Composable
 fun ProvisioningTestScreen(
