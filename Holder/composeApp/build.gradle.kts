@@ -56,6 +56,7 @@ kotlin {
             implementation(libs.ktor.client.core)
             // CIO for JVM/Android; Darwin engine for iOS in iosMain
             implementation(libs.ktor.client.cio)
+            implementation(libs.coil.compose)
         }
         val iosMain by getting {
             dependencies {

@@ -117,6 +117,7 @@ private fun Authorize(
                 provisioningSupport = provisioningSupport
             )
         }
+        is AuthorizationChallenge.SecretText -> TODO()
     }
 }
 

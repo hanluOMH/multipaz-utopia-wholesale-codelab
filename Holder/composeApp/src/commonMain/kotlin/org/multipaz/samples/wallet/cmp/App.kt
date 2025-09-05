@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import coil3.ImageLoader
+import coil3.compose.LocalPlatformContext
 import io.ktor.utils.io.printStack
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -80,7 +82,6 @@ import org.multipaz.mdoc.transport.MdocTransportFactory
 import org.multipaz.mdoc.transport.MdocTransportOptions
 import org.multipaz.mdoc.transport.advertise
 import org.multipaz.mdoc.transport.waitForConnection
-import org.multipaz.models.digitalcredentials.DigitalCredentials
 import org.multipaz.models.presentment.MdocPresentmentMechanism
 import org.multipaz.models.presentment.PresentmentModel
 import org.multipaz.models.presentment.PresentmentSource
@@ -114,9 +115,9 @@ import org.multipaz.securearea.CreateKeySettings as SA_CreateKeySettings
  * Use [App.Companion.getInstance] to get an instance.
  */
 class App() {
-    val TAG="APP"
-    private  val OID4VCI_CREDENTIAL_OFFER_URL_SCHEME = "openid-credential-offer://"
-    private  val HAIP_URL_SCHEME = "haip://"
+    val TAG = "APP"
+    private val OID4VCI_CREDENTIAL_OFFER_URL_SCHEME = "openid-credential-offer://"
+    private val HAIP_URL_SCHEME = "haip://"
     lateinit var storage: Storage
     lateinit var documentTypeRepository: DocumentTypeRepository
     lateinit var secureAreaRepository: SecureAreaRepository
@@ -125,15 +126,16 @@ class App() {
     lateinit var readerTrustManager: TrustManager
     lateinit var presentmentModel: PresentmentModel
     lateinit var presentmentSource: PresentmentSource
-    lateinit var  provisioningModel: ProvisioningModel
+    lateinit var provisioningModel: ProvisioningModel
 
     private val credentialOffers = Channel<String>()
+
     // Remove the Openid4vciModelEnroll dependency
-    val provisioningSupport= ProvisioningSupport()
+    val provisioningSupport = ProvisioningSupport()
 
     // Remove the enrollmentProvisioningModel variable - we'll use the single provisioningModel
 
-    var display =false
+    var display = false
     private val initLock = Mutex()
     private var initialized = false
 
@@ -156,7 +158,10 @@ class App() {
                 addDocumentType(DrivingLicense.getDocumentType())
                 addDocumentType(PhotoID.getDocumentType())
             }
-            documentStore = buildDocumentStore(storage = storage, secureAreaRepository = secureAreaRepository) {}
+            documentStore = buildDocumentStore(
+                storage = storage,
+                secureAreaRepository = secureAreaRepository
+            ) {}
 
             // Initialize the single, persistent ProvisioningModel directly
             provisioningModel = ProvisioningModel(
@@ -169,21 +174,22 @@ class App() {
                 documentMetadataInitializer = ::initializeDocumentMetadata
             )
 
-            Logger.i(TAG,"init provisioningModel is $provisioningModel")
+            Logger.i(TAG, "init provisioningModel is $provisioningModel")
 
             if (documentStore.listDocuments().isEmpty()) {
-                Logger.i(appName,"create document")
-            }else{
-                Logger.i(appName,"document already exists")
+                Logger.i(appName, "create document")
+            } else {
+                Logger.i(appName, "document already exists")
             }
             presentmentModel = PresentmentModel().apply { setPromptModel(promptModel) }
 
             val tm = TrustManagerLocal(storage = storage, identifier = "reader")
             try {
-                tm.apply{
+                tm.apply {
                     addX509Cert(
                         certificate = X509Cert.fromPem(
-                            Res.readBytes("files/test_app_reader_root_certificate.pem").decodeToString().trimIndent().trim()
+                            Res.readBytes("files/test_app_reader_root_certificate.pem")
+                                .decodeToString().trimIndent().trim()
                         ),
                         metadata = TrustMetadata(
                             displayName = "OWF Multipaz Test App Reader",
@@ -193,7 +199,8 @@ class App() {
                     )
                     addX509Cert(
                         certificate = X509Cert.fromPem(
-                            Res.readBytes("files/reader_root_certificate.pem").decodeToString().trimIndent().trim(),
+                            Res.readBytes("files/reader_root_certificate.pem").decodeToString()
+                                .trimIndent().trim(),
                         ),
                         metadata = TrustMetadata(
                             displayName = "Multipaz Identity Reader (Trusted Devices)",
@@ -203,7 +210,8 @@ class App() {
                     )
                     addX509Cert(
                         certificate = X509Cert.fromPem(
-                            Res.readBytes("files/reader_root_certificate_for_untrust_device.pem").decodeToString().trimIndent().trim(),
+                            Res.readBytes("files/reader_root_certificate_for_untrust_device.pem")
+                                .decodeToString().trimIndent().trim(),
                         ),
                         metadata = TrustMetadata(
                             displayName = "Multipaz Identity Reader (UnTrusted Devices)",
@@ -212,7 +220,7 @@ class App() {
                         )
                     )
                 }
-            }catch (e: TrustPointAlreadyExistsException){
+            } catch (e: TrustPointAlreadyExistsException) {
                 e.printStack()
             }
 
@@ -227,7 +235,7 @@ class App() {
                 domainMdocSignature = TestAppUtils.CREDENTIAL_DOMAIN_MDOC_USER_AUTH,
                 domainMdocKeyAgreement = TestAppUtils.CREDENTIAL_DOMAIN_MDOC_MAC_USER_AUTH,
                 domainKeylessSdJwt = TestAppUtils.CREDENTIAL_DOMAIN_SDJWT_KEYLESS,
-                domainKeyBoundSdJwt =TestAppUtils.CREDENTIAL_DOMAIN_SDJWT_USER_AUTH
+                domainKeyBoundSdJwt = TestAppUtils.CREDENTIAL_DOMAIN_SDJWT_USER_AUTH
             )
             initialized = true
         }
@@ -304,7 +312,10 @@ class App() {
                         clientPreferences = ProvisioningSupport.OPENID4VCI_CLIENT_PREFERENCES,
                         backend = stableProvisioningSupport
                     )
-                    Logger.i(TAG, "LaunchedEffect: Provisioning launched, navigating to provisioning")
+                    Logger.i(
+                        TAG,
+                        "LaunchedEffect: Provisioning launched, navigating to provisioning"
+                    )
                     navController.navigate("provisioning")
                     Logger.i(TAG, "LaunchedEffect: Navigation completed")
                 }
@@ -344,13 +355,19 @@ class App() {
         ) { paddingValues ->
             when (selectedTab.value) {
                 0 -> ExploreScreen(modifier = Modifier.padding(paddingValues))
-                1 -> AccountScreen(modifier = Modifier.padding(paddingValues), deviceEngagement = deviceEngagement)
+                1 -> AccountScreen(
+                    modifier = Modifier.padding(paddingValues),
+                    deviceEngagement = deviceEngagement
+                )
             }
         }
     }
 
     @Composable
-    private fun AccountScreen(modifier: Modifier = Modifier, deviceEngagement: MutableState<ByteString?>) {
+    private fun AccountScreen(
+        modifier: Modifier = Modifier,
+        deviceEngagement: MutableState<ByteString?>
+    ) {
         Column(
             modifier = modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -379,6 +396,11 @@ class App() {
                 }
             }
         } else {
+            val context = LocalPlatformContext.current
+            val imageLoader = remember {
+                ImageLoader.Builder(context).components { /* network loader omitted */ }.build()
+            }
+
             val state = presentmentModel.state.collectAsState()
             val noCredentialDialog = remember { mutableStateOf(false) }
             when (state.value) {
@@ -400,9 +422,10 @@ class App() {
                     }
                 }
 
-                PresentmentModel.State.WAITING_FOR_SOURCE ->{
+                PresentmentModel.State.WAITING_FOR_SOURCE -> {
                     presentmentModel.setSource(presentmentSource)
                 }
+
                 PresentmentModel.State.PROCESSING,
                 PresentmentModel.State.WAITING_FOR_CONSENT,
                 PresentmentModel.State.COMPLETED -> {
@@ -412,6 +435,7 @@ class App() {
                         presentmentModel = presentmentModel,
                         presentmentSource = presentmentSource,
                         documentTypeRepository = documentTypeRepository,
+                        imageLoader = imageLoader,
                         onPresentmentComplete = {
                             presentmentModel.reset()
                         },
@@ -491,7 +515,8 @@ class App() {
                 text = "The mDL is also available\n" +
                         "via NFC engagement and W3C DC API\n" +
                         "(Android-only right now)",
-                textAlign = TextAlign.Center)
+                textAlign = TextAlign.Center
+            )
         }
     }
 
@@ -538,24 +563,31 @@ class App() {
      */
     fun handleUrl(url: String) {
         Logger.i(TAG, "handleUrl called with: $url")
-        Logger.i(TAG,"handleuir provisioningModel sate: ${provisioningModel.state.value}")
+        Logger.i(TAG, "handleuir provisioningModel sate: ${provisioningModel.state.value}")
         if (url.startsWith(OID4VCI_CREDENTIAL_OFFER_URL_SCHEME)
-            || url.startsWith(HAIP_URL_SCHEME)) {
+            || url.startsWith(HAIP_URL_SCHEME)
+        ) {
             val queryIndex = url.indexOf('?')
             if (queryIndex >= 0) {
-                Logger.i(TAG,"Starting OpenID4VCI provisioning with: $url")
-                Logger.i(TAG,"OID4VCI_CREDENTIAL_OFFER_URL_SCHEME provisioningModel: $provisioningModel")
+                Logger.i(TAG, "Starting OpenID4VCI provisioning with: $url")
+                Logger.i(
+                    TAG,
+                    "OID4VCI_CREDENTIAL_OFFER_URL_SCHEME provisioningModel: $provisioningModel"
+                )
                 Logger.i(TAG, "handleUrl: Sending credential offer to channel...")
                 CoroutineScope(Dispatchers.Default).launch {
                     Logger.i(TAG, "handleUrl: About to send to credentialOffers channel")
                     credentialOffers.send(url)
                     Logger.i(TAG, "handleUrl: Successfully sent to credentialOffers channel")
                 }
-                Logger.i(TAG, "handleUrl: Credential offer sent to channel, LaunchedEffect should process it")
+                Logger.i(
+                    TAG,
+                    "handleUrl: Credential offer sent to channel, LaunchedEffect should process it"
+                )
                 // Navigate to ProvisioningTestScreen after starting provisioning (commented out, handled by LaunchedEffect)
             }
         } else if (url.startsWith(ProvisioningSupport.APP_LINK_BASE_URL)) {
-            Logger.i(TAG,"APP_LINK_BASE_URL provisioningModel: $provisioningModel")
+            Logger.i(TAG, "APP_LINK_BASE_URL provisioningModel: $provisioningModel")
             Logger.i(TAG, "Processing app link invocation: $url")
 
             // Check if we have an active provisioning session (removed by assistant, re-added by user, then removed again)
