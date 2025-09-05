@@ -50,6 +50,7 @@ kotlin {
             implementation(libs.multipaz.doctypes)
             implementation(libs.multipaz.models)
             implementation(libs.multipaz.compose)
+            implementation(libs.coil.compose)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)

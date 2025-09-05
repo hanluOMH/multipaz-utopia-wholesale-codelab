@@ -1,14 +1,12 @@
 package org.multipaz.samples.wallet.cmp
 
+
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import coil3.ImageLoader
 import org.multipaz.compose.mdoc.MdocNfcPresentmentActivity
 
 class NfcActivity: MdocNfcPresentmentActivity() {
-    @Composable
-    override fun ApplicationTheme(content: @Composable (() -> Unit)) {
-        content()
-    }
-
     override suspend fun getSettings(): Settings {
         val app = App.getInstance()
         app.init()
@@ -16,7 +14,9 @@ class NfcActivity: MdocNfcPresentmentActivity() {
             appName = app.appName,
             appIcon = app.appIcon,
             promptModel = App.promptModel,
+            applicationTheme = @Composable { content -> MaterialTheme { content() } },
             documentTypeRepository = app.documentTypeRepository,
+            imageLoader = ImageLoader.Builder(applicationContext).components { /* network loader omitted */ }.build(),
             presentmentSource = app.presentmentSource
         )
     }
