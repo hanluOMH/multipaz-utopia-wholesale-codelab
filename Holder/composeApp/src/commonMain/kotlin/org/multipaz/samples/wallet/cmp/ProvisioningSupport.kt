@@ -45,12 +45,13 @@ import kotlin.time.ExperimentalTime
 class ProvisioningSupport: OpenID4VCIBackend {
     val TAG ="PRO:ProvisioningSupport"
     companion object Companion {
-        const val APP_LINK_SERVER = "https://apps.multipaz.org"
-        const val APP_LINK_BASE_URL = "$APP_LINK_SERVER/landing/"
+        const val APP_LINK_SERVER = "wholesale-test-app"
+        const val APP_LINK_BASE_URL = "${APP_LINK_SERVER}://landing/"
 
-// Alternative custom scheme (security is lower)
-//        const val APP_LINK_SERVER = "multipaz-test-app"
-//        const val APP_LINK_BASE_URL = "${APP_LINK_SERVER}://landing/"
+        // Alternative HTTP App Links (more secure). See AndroidManifest.xml Option #2
+        /*const val APP_LINK_SERVER = "https://apps.multipaz.org"
+        const val APP_LINK_BASE_URL = "$APP_LINK_SERVER/landing/"*/
+
 
         private val localClientAssertionJwk = Json.parseToJsonElement("""
             {
