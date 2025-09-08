@@ -4,14 +4,18 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -33,8 +37,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -368,6 +374,16 @@ class App() {
         modifier: Modifier = Modifier,
         deviceEngagement: MutableState<ByteString?>
     ) {
+        val hasCredentials = remember { mutableStateOf<Boolean?>(null) }
+        val coroutineScope = rememberCoroutineScope { promptModel }
+        
+        // Check for usable credentials when the composable is first created
+        LaunchedEffect(Unit) {
+            val hasCred = hasAnyUsableCredential()
+            hasCredentials.value = hasCred
+            Logger.i(TAG, "AccountScreen: hasAnyUsableCredential: $hasCred")
+        }
+        
         Column(
             modifier = modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -375,8 +391,11 @@ class App() {
             PromptDialogs(promptModel)
             Spacer(modifier = Modifier.height(30.dp))
             MembershipCard()
+            
+            // Credential status indicator below the card
+            Spacer(modifier = Modifier.height(16.dp))
+            CredentialStatusIndicator(hasCredentials.value)
         }
-        val coroutineScope = rememberCoroutineScope { promptModel }
         val blePermissionState = rememberBluetoothPermissionState()
 
         if (!blePermissionState.isGranted) {
@@ -458,65 +477,144 @@ class App() {
     }
 
     @Composable
+    private fun CredentialStatusIndicator(hasCredentials: Boolean?) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            when (hasCredentials) {
+                true -> {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Credential Available",
+                        tint = Color(0xFF4CAF50), // Green color
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Credential is available",
+                        color = Color(0xFF4CAF50), // Green color
+                        fontSize = 14.sp
+                    )
+                }
+                false -> {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "No Credential",
+                        tint = Color(0xFFF44336), // Red color
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Credential not available",
+                        color = Color(0xFFF44336), // Red color
+                        fontSize = 14.sp
+                    )
+                }
+                null -> {
+                    Text(
+                        text = "Checking credential status...",
+                        color = Color(0xFF666666), // Gray color
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
     private fun showQrButton(showQrCode: MutableState<ByteString?>) {
+        val hasCredentials = remember { mutableStateOf<Boolean?>(null) }
+        val coroutineScope = rememberCoroutineScope { promptModel }
+        val uriHandler = LocalUriHandler.current
+        
+        // Check for usable credentials when the composable is first created
+        LaunchedEffect(Unit) {
+            val hasCred = hasAnyUsableCredential()
+            hasCredentials.value = hasCred
+            Logger.i(TAG, "showQrButton: hasAnyUsableCredential: $hasCred")
+        }
+        
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Button(onClick = {
-                presentmentModel.reset()
-                presentmentModel.setConnecting()
-                presentmentModel.presentmentScope.launch() {
-                    val connectionMethods = listOf(
-                        MdocConnectionMethodBle(
-                            supportsPeripheralServerMode = false,
-                            supportsCentralClientMode = true,
-                            peripheralServerModeUuid = null,
-                            centralClientModeUuid = UUID.randomUUID(),
+            // Only show the button if we have usable credentials
+            if (hasCredentials.value == true) {
+                Button(onClick = {
+                    presentmentModel.reset()
+                    presentmentModel.setConnecting()
+                    presentmentModel.presentmentScope.launch() {
+                        val connectionMethods = listOf(
+                            MdocConnectionMethodBle(
+                                supportsPeripheralServerMode = false,
+                                supportsCentralClientMode = true,
+                                peripheralServerModeUuid = null,
+                                centralClientModeUuid = UUID.randomUUID(),
+                            )
                         )
-                    )
-                    val eDeviceKey = Crypto.createEcPrivateKey(EcCurve.P256)
-                    val advertisedTransports = connectionMethods.advertise(
-                        role = MdocRole.MDOC,
-                        transportFactory = MdocTransportFactory.Default,
-                        options = MdocTransportOptions(bleUseL2CAP = true),
-                    )
-                    val engagementGenerator = EngagementGenerator(
-                        eSenderKey = eDeviceKey.publicKey,
-                        version = "1.0"
-                    )
-                    engagementGenerator.addConnectionMethods(advertisedTransports.map {
-                        it.connectionMethod
-                    })
-                    val encodedDeviceEngagement = ByteString(engagementGenerator.generate())
-                    showQrCode.value = encodedDeviceEngagement
-                    val transport = advertisedTransports.waitForConnection(
-                        eSenderKey = eDeviceKey.publicKey,
-                        coroutineScope = presentmentModel.presentmentScope
-                    )
-                    presentmentModel.setMechanism(
-                        MdocPresentmentMechanism(
-                            transport = transport,
-                            eDeviceKey = eDeviceKey,
-                            encodedDeviceEngagement = encodedDeviceEngagement,
-                            handover = Simple.NULL,
-                            engagementDuration = null,
-                            allowMultipleRequests = false
+                        val eDeviceKey = Crypto.createEcPrivateKey(EcCurve.P256)
+                        val advertisedTransports = connectionMethods.advertise(
+                            role = MdocRole.MDOC,
+                            transportFactory = MdocTransportFactory.Default,
+                            options = MdocTransportOptions(bleUseL2CAP = true),
                         )
-                    )
-                    showQrCode.value = null
+                        val engagementGenerator = EngagementGenerator(
+                            eSenderKey = eDeviceKey.publicKey,
+                            version = "1.0"
+                        )
+                        engagementGenerator.addConnectionMethods(advertisedTransports.map {
+                            it.connectionMethod
+                        })
+                        val encodedDeviceEngagement = ByteString(engagementGenerator.generate())
+                        showQrCode.value = encodedDeviceEngagement
+                        val transport = advertisedTransports.waitForConnection(
+                            eSenderKey = eDeviceKey.publicKey,
+                            coroutineScope = presentmentModel.presentmentScope
+                        )
+                        presentmentModel.setMechanism(
+                            MdocPresentmentMechanism(
+                                transport = transport,
+                                eDeviceKey = eDeviceKey,
+                                encodedDeviceEngagement = encodedDeviceEngagement,
+                                handover = Simple.NULL,
+                                engagementDuration = null,
+                                allowMultipleRequests = false
+                            )
+                        )
+                        showQrCode.value = null
+                    }
+                }) {
+                    Text("Present mDL via QR")
                 }
-            }) {
-                Text("Present mDL via QR")
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "The mDL is also available\n" +
+                            "via NFC engagement and W3C DC API\n" +
+                            "(Android-only right now)",
+                    textAlign = TextAlign.Center
+                )
+            } else if (hasCredentials.value == false) {
+                // Show a message when no credentials are available
+                Text(
+                    text = "No usable credentials available.\nPlease add a credential first.",
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        Logger.i(TAG, "Opening issuer website: https://issuer.multipaz.org")
+                        uriHandler.openUri("https://issuer.multipaz.org")
+                    }
+                ) {
+                    Text("Get Credentials from Issuer")
+                }
+            } else {
+                // Show loading state while checking credentials
+                Text("Checking credentials...")
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "The mDL is also available\n" +
-                        "via NFC engagement and W3C DC API\n" +
-                        "(Android-only right now)",
-                textAlign = TextAlign.Center
-            )
         }
     }
 
@@ -530,7 +628,7 @@ class App() {
             if (deviceEngagement.value != null) {
                 val mdocUrl = "mdoc:" + deviceEngagement.value!!.toByteArray().toBase64Url()
                 val qrCodeBitmap = remember { generateQrCode(mdocUrl) }
-                Spacer(modifier = Modifier.height(256.dp))
+                Spacer(modifier = Modifier.height(330.dp))
                 Text(text = "Present QR code to mdoc reader")
                 Image(
                     modifier = Modifier.fillMaxWidth(),
