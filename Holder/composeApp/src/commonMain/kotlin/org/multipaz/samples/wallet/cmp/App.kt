@@ -63,13 +63,12 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.compose.resources.painterResource
 import org.multipaz.cbor.Cbor
-import org.multipaz.cbor.Simple
+import org.multipaz.compose.permissions.rememberBluetoothEnabledState
 import org.multipaz.compose.permissions.rememberBluetoothPermissionState
-import org.multipaz.compose.presentment.Presentment
+import org.multipaz.compose.presentment.MdocProximityQrPresentment
+import org.multipaz.compose.presentment.MdocProximityQrSettings
 import org.multipaz.compose.prompt.PromptDialogs
 import org.multipaz.compose.qrcode.generateQrCode
-import org.multipaz.crypto.Crypto
-import org.multipaz.crypto.EcCurve
 import org.multipaz.crypto.X509Cert
 import org.multipaz.document.AbstractDocumentMetadata
 import org.multipaz.document.DocumentMetadata
@@ -80,15 +79,9 @@ import org.multipaz.documenttype.knowntypes.DrivingLicense
 import org.multipaz.documenttype.knowntypes.PhotoID
 import org.multipaz.mdoc.connectionmethod.MdocConnectionMethodBle
 import org.multipaz.mdoc.credential.MdocCredential
-import org.multipaz.mdoc.engagement.EngagementGenerator
 import org.multipaz.mdoc.mso.MobileSecurityObjectParser
 import org.multipaz.mdoc.mso.StaticAuthDataParser
-import org.multipaz.mdoc.role.MdocRole
-import org.multipaz.mdoc.transport.MdocTransportFactory
 import org.multipaz.mdoc.transport.MdocTransportOptions
-import org.multipaz.mdoc.transport.advertise
-import org.multipaz.mdoc.transport.waitForConnection
-import org.multipaz.models.presentment.MdocPresentmentMechanism
 import org.multipaz.models.presentment.PresentmentModel
 import org.multipaz.models.presentment.PresentmentSource
 import org.multipaz.models.presentment.SimplePresentmentSource
@@ -397,6 +390,7 @@ class App() {
             CredentialStatusIndicator(hasCredentials.value)
         }
         val blePermissionState = rememberBluetoothPermissionState()
+        val bleEnabledState = rememberBluetoothEnabledState()
 
         if (!blePermissionState.isGranted) {
             Column(
@@ -414,7 +408,17 @@ class App() {
                     Text("Request BLE permissions")
                 }
             }
-        } else {
+        } else if (!bleEnabledState.isEnabled) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Button(onClick = { coroutineScope.launch { bleEnabledState.enable() } }) {
+                    Text("Enable BLE")
+                }
+            }
+        }else {
             val context = LocalPlatformContext.current
             val imageLoader = remember {
                 ImageLoader.Builder(context).components { /* network loader omitted */ }.build()
@@ -422,45 +426,18 @@ class App() {
 
             val state = presentmentModel.state.collectAsState()
             val noCredentialDialog = remember { mutableStateOf(false) }
-            when (state.value) {
-                PresentmentModel.State.IDLE -> {
-                    showQrButton(deviceEngagement)
-                }
-
-                PresentmentModel.State.CONNECTING -> {
-                    LaunchedEffect(Unit) {
-                        val hasCred = hasAnyUsableCredential()
-                        Logger.i(TAG, "hasAnyUsableCredential: $hasCred")
-                        if (!hasCred) {
-                            noCredentialDialog.value = true
-                            presentmentModel.reset()
-                        }
-                    }
-                    if (!noCredentialDialog.value) {
-                        showQrCode(deviceEngagement)
-                    }
-                }
-
-                PresentmentModel.State.WAITING_FOR_SOURCE -> {
-                    presentmentModel.setSource(presentmentSource)
-                }
-
-                PresentmentModel.State.PROCESSING,
-                PresentmentModel.State.WAITING_FOR_CONSENT,
-                PresentmentModel.State.COMPLETED -> {
-                    Presentment(
-                        appName = appName,
-                        appIconPainter = painterResource(appIcon),
-                        presentmentModel = presentmentModel,
-                        presentmentSource = presentmentSource,
-                        documentTypeRepository = documentTypeRepository,
-                        imageLoader = imageLoader,
-                        onPresentmentComplete = {
-                            presentmentModel.reset()
-                        },
-                    )
-                }
-            }
+            MdocProximityQrPresentment(
+                appName = appName,
+                appIconPainter = painterResource(appIcon),
+                presentmentModel = presentmentModel,
+                presentmentSource = presentmentSource,
+                promptModel = promptModel,
+                documentTypeRepository = documentTypeRepository,
+                imageLoader = imageLoader,
+                allowMultipleRequests = false,
+                showQrButton = { onQrButtonClicked -> ShowQrButton(onQrButtonClicked) },
+                showQrCode = { uri -> ShowQrCode(uri) }
+            )
             if (noCredentialDialog.value) {
                 AlertDialog(
                     onDismissRequest = { noCredentialDialog.value = false },
@@ -524,7 +501,7 @@ class App() {
     }
 
     @Composable
-    private fun showQrButton(showQrCode: MutableState<ByteString?>) {
+    private fun ShowQrButton(onQrButtonClicked: (settings: MdocProximityQrSettings) -> Unit) {
         val hasCredentials = remember { mutableStateOf<Boolean?>(null) }
         val coroutineScope = rememberCoroutineScope { promptModel }
         val uriHandler = LocalUriHandler.current
@@ -544,48 +521,20 @@ class App() {
             // Only show the button if we have usable credentials
             if (hasCredentials.value == true) {
                 Button(onClick = {
-                    presentmentModel.reset()
-                    presentmentModel.setConnecting()
-                    presentmentModel.presentmentScope.launch() {
-                        val connectionMethods = listOf(
-                            MdocConnectionMethodBle(
-                                supportsPeripheralServerMode = false,
-                                supportsCentralClientMode = true,
-                                peripheralServerModeUuid = null,
-                                centralClientModeUuid = UUID.randomUUID(),
-                            )
+                    val connectionMethods = listOf(
+                        MdocConnectionMethodBle(
+                            supportsPeripheralServerMode = false,
+                            supportsCentralClientMode = true,
+                            peripheralServerModeUuid = null,
+                            centralClientModeUuid = UUID.randomUUID(),
                         )
-                        val eDeviceKey = Crypto.createEcPrivateKey(EcCurve.P256)
-                        val advertisedTransports = connectionMethods.advertise(
-                            role = MdocRole.MDOC,
-                            transportFactory = MdocTransportFactory.Default,
-                            options = MdocTransportOptions(bleUseL2CAP = true),
+                    )
+                    onQrButtonClicked(
+                        MdocProximityQrSettings(
+                            availableConnectionMethods = connectionMethods,
+                            createTransportOptions = MdocTransportOptions(bleUseL2CAP = true)
                         )
-                        val engagementGenerator = EngagementGenerator(
-                            eSenderKey = eDeviceKey.publicKey,
-                            version = "1.0"
-                        )
-                        engagementGenerator.addConnectionMethods(advertisedTransports.map {
-                            it.connectionMethod
-                        })
-                        val encodedDeviceEngagement = ByteString(engagementGenerator.generate())
-                        showQrCode.value = encodedDeviceEngagement
-                        val transport = advertisedTransports.waitForConnection(
-                            eSenderKey = eDeviceKey.publicKey,
-                            coroutineScope = presentmentModel.presentmentScope
-                        )
-                        presentmentModel.setMechanism(
-                            MdocPresentmentMechanism(
-                                transport = transport,
-                                eDeviceKey = eDeviceKey,
-                                encodedDeviceEngagement = encodedDeviceEngagement,
-                                handover = Simple.NULL,
-                                engagementDuration = null,
-                                allowMultipleRequests = false
-                            )
-                        )
-                        showQrCode.value = null
-                    }
+                    )
                 }) {
                     Text("Present mDL via QR")
                 }
@@ -619,31 +568,29 @@ class App() {
     }
 
     @Composable
-    private fun showQrCode(deviceEngagement: MutableState<ByteString?>) {
+    private fun ShowQrCode(uri: String) {
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (deviceEngagement.value != null) {
-                val mdocUrl = "mdoc:" + deviceEngagement.value!!.toByteArray().toBase64Url()
-                val qrCodeBitmap = remember { generateQrCode(mdocUrl) }
-                Spacer(modifier = Modifier.height(330.dp))
-                Text(text = "Present QR code to mdoc reader")
-                Image(
-                    modifier = Modifier.fillMaxWidth(),
-                    bitmap = qrCodeBitmap,
-                    contentDescription = null,
-                    contentScale = ContentScale.FillWidth
-                )
-                Button(
-                    onClick = {
-                        presentmentModel.reset()
-                    }
-                ) {
-                    Text("Cancel")
+            val qrCodeBitmap = remember { generateQrCode(uri) }
+            Spacer(modifier = Modifier.height(330.dp))
+            Text(text = "Present QR code to mdoc reader")
+            Image(
+                modifier = Modifier.fillMaxWidth(),
+                bitmap = qrCodeBitmap,
+                contentDescription = null,
+                contentScale = ContentScale.FillWidth
+            )
+            Button(
+                onClick = {
+                    presentmentModel.reset()
                 }
+            ) {
+                Text("Cancel")
             }
+
         }
     }
 
