@@ -75,15 +75,8 @@ fun ProvisioningTestScreen(
                 text = "For details: adb logcat -s ProvisioningModel"
             )
         } else {
-            val text=""
-            //TODO: implement text
-            Text(
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(8.dp),
-                style = MaterialTheme.typography.titleLarge,
-                text = text
-            )
+            //TODO: update text depends on provisioningState
+
         }
     }
 }
@@ -101,7 +94,7 @@ private fun Authorize(
             Logger.i(EvidenceRequestWebView, "Authorize: Rendering EvidenceRequestWebView for OAuth challenge")
             //TODO: init  EvidenceRequestWebView
         }
-        is AuthorizationChallenge.SecretText -> TODO()
+        is AuthorizationChallenge.SecretText -> {}
     }
 }
 

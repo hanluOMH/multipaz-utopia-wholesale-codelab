@@ -45,9 +45,7 @@ import kotlin.time.ExperimentalTime
 class ProvisioningSupport: OpenID4VCIBackend {
     val TAG ="PRO:ProvisioningSupport"
     companion object Companion {
-        const val APP_LINK_SERVER=""
-       //TODO:  Add const val APP_LINK_SERVER = "https://apps.multipaz.org"
-
+        const val APP_LINK_SERVER = "wholesale-test-app"
         const val APP_LINK_BASE_URL = "${APP_LINK_SERVER}://landing/"
 
         // Alternative HTTP App Links (more secure). See AndroidManifest.xml Option #2
@@ -93,12 +91,8 @@ class ProvisioningSupport: OpenID4VCIBackend {
             attestationCertificate.subject.components[OID.COMMON_NAME.oid]?.value
                 ?: throw IllegalStateException("No common name (CN) in certificate's subject")
 
-        val OPENID4VCI_CLIENT_PREFERENCES = OpenID4VCIClientPreferences(
-            clientId = CLIENT_ID,
-            redirectUrl = APP_LINK_BASE_URL,
-            locales = listOf("en-US"),
-            signingAlgorithms = listOf(Algorithm.ESP256, Algorithm.ESP384, Algorithm.ESP512)
-        )
+        //TODO: implement OpenID4VCI_CLIENT_PREFERENCES
+
     }
 
     private val lock = Mutex()
@@ -125,7 +119,7 @@ class ProvisioningSupport: OpenID4VCIBackend {
     override suspend fun createJwtClientAssertion(tokenUrl: String): String {
         val alg = localClientAssertionPrivateKey.curve.defaultSigningAlgorithmFullySpecified.joseAlgorithmIdentifier
         val head =""
-        //TODO implement head
+        //TODO: implement head
 
         val aud = if (tokenUrl.endsWith("/token")) {
             // A hack to get authorization url from token url; would not work in general case.

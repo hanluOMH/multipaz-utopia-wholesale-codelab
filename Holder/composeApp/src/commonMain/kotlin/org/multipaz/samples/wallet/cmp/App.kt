@@ -268,11 +268,8 @@ class App() {
                     val credentialOffer = credentialOffers.receive()
                     Logger.i(TAG, "LaunchedEffect: Received credential offer: $credentialOffer")
                     Logger.i(TAG, "LaunchedEffect: Launching OpenID4VCI provisioning...")
-                    stableProvisioningModel.launchOpenID4VCIProvisioning(
-                        offerUri = credentialOffer,
-                        clientPreferences = ProvisioningSupport.OPENID4VCI_CLIENT_PREFERENCES,
-                        backend = stableProvisioningSupport
-                    )
+                    //TODO, implement launchOpenID4VCIProvisioning
+
                     Logger.i(
                         TAG,
                         "LaunchedEffect: Provisioning launched, navigating to provisioning"
@@ -465,7 +462,6 @@ class App() {
     @Composable
     private fun ShowQrButton(onQrButtonClicked: (settings: MdocProximityQrSettings) -> Unit) {
         val hasCredentials = remember { mutableStateOf<Boolean?>(null) }
-        val coroutineScope = rememberCoroutineScope { promptModel }
         val uriHandler = LocalUriHandler.current
         
         // Check for usable credentials when the composable is first created
@@ -482,31 +478,8 @@ class App() {
         ) {
             // Only show the button if we have usable credentials
             if (hasCredentials.value == true) {
-                Button(onClick = {
-                    val connectionMethods = listOf(
-                        MdocConnectionMethodBle(
-                            supportsPeripheralServerMode = false,
-                            supportsCentralClientMode = true,
-                            peripheralServerModeUuid = null,
-                            centralClientModeUuid = UUID.randomUUID(),
-                        )
-                    )
-                    onQrButtonClicked(
-                        MdocProximityQrSettings(
-                            availableConnectionMethods = connectionMethods,
-                            createTransportOptions = MdocTransportOptions(bleUseL2CAP = true)
-                        )
-                    )
-                }) {
-                    Text("Present mDL via QR")
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "The mDL is also available\n" +
-                            "via NFC engagement and W3C DC API\n" +
-                            "(Android-only right now)",
-                    textAlign = TextAlign.Center
-                )
+                // TODO: show qr button when credentials are available
+
             } else if (hasCredentials.value == false) {
                 // Show a message when no credentials are available
                 Text(
@@ -539,12 +512,8 @@ class App() {
             val qrCodeBitmap = remember { generateQrCode(uri) }
             Spacer(modifier = Modifier.height(330.dp))
             Text(text = "Present QR code to mdoc reader")
-            Image(
-                modifier = Modifier.fillMaxWidth(),
-                bitmap = qrCodeBitmap,
-                contentDescription = null,
-                contentScale = ContentScale.FillWidth
-            )
+            //TODO: show QR code
+
             Button(
                 onClick = {
                     presentmentModel.reset()
@@ -603,7 +572,8 @@ class App() {
             CoroutineScope(Dispatchers.Default).launch {
                 try {
                     Logger.i(TAG, "handleUrl: About to process app link invocation")
-                    //TODO:    provisioningSupport.processAppLinkInvocation(url)
+                    //TODO:    call processAppLinkInvocation(url)
+
                     Logger.i(TAG, "handleUrl: App link invocation processed successfully")
                 } catch (e: Exception) {
                     Logger.e(TAG, "Error processing app link: ${e.message}", e)
